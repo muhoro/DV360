@@ -83,6 +83,8 @@ public sealed class Dv360GeoTargeting
 /// <summary>
 /// Represents a device type targeting assignment for a line item.
 /// <para>
+/// Device type targeting in DV360 is positive-only — you include the device types you
+/// want to serve on. If no device types are specified, ads serve on all devices.
 /// Valid device types include:
 /// <c>"DEVICE_TYPE_COMPUTER"</c>, <c>"DEVICE_TYPE_CONNECTED_TV"</c>,
 /// <c>"DEVICE_TYPE_SMART_PHONE"</c>, <c>"DEVICE_TYPE_TABLET"</c>.
@@ -95,12 +97,6 @@ public sealed class Dv360DeviceTypeTargeting
     /// (e.g., <c>"DEVICE_TYPE_COMPUTER"</c>, <c>"DEVICE_TYPE_SMART_PHONE"</c>).
     /// </summary>
     public required string DeviceType { get; set; }
-
-    /// <summary>
-    /// When <c>true</c>, the device type is excluded rather than targeted.
-    /// Defaults to <c>false</c> (positive targeting).
-    /// </summary>
-    public bool Negative { get; set; }
 }
 
 /// <summary>
@@ -149,9 +145,14 @@ public sealed class Dv360ChannelTargeting
 /// Represents a digital content label exclusion for brand safety.
 /// <para>
 /// Content labels classify inventory by sensitivity. Excluding a label prevents ads
-/// from serving on matching inventory. Common values include:
+/// from serving on matching inventory. Maps to the Google SDK's
+/// <c>DigitalContentLabelAssignedTargetingOptionDetails.ExcludedContentRatingTier</c>.
+/// </para>
+/// <para>
+/// Common values include:
 /// <c>"CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE"</c>, <c>"CONTENT_LABEL_TYPE_BELOW_THE_FOLD"</c>,
-/// <c>"CONTENT_LABEL_TYPE_PROFANITY"</c>, <c>"CONTENT_LABEL_TYPE_TRAGEDY"</c>.
+/// <c>"CONTENT_LABEL_TYPE_PROFANITY"</c>, <c>"CONTENT_LABEL_TYPE_TRAGEDY"</c>,
+/// <c>"CONTENT_LABEL_TYPE_TRANSPORTATION_ACCIDENTS"</c>, <c>"CONTENT_LABEL_TYPE_SENSITIVE_SOCIAL_ISSUES"</c>.
 /// </para>
 /// </summary>
 public sealed class Dv360ContentLabelExclusionTargeting
@@ -183,7 +184,8 @@ public sealed class Dv360ContentInstreamPositionTargeting
 /// <summary>
 /// Represents a viewability targeting assignment for a line item.
 /// <para>
-/// Filters inventory by predicted viewability percentage. Common values:
+/// Filters inventory by predicted viewability percentage. Maps to the Google SDK's
+/// <c>ViewabilityAssignedTargetingOptionDetails.Viewability</c>. Common values:
 /// <c>"VIEWABILITY_10_PERCENT_OR_MORE"</c>, <c>"VIEWABILITY_20_PERCENT_OR_MORE"</c>, etc.
 /// up to <c>"VIEWABILITY_90_PERCENT_OR_MORE"</c>.
 /// </para>
@@ -191,7 +193,8 @@ public sealed class Dv360ContentInstreamPositionTargeting
 public sealed class Dv360ViewabilityTargeting
 {
     /// <summary>
-    /// The DV360 viewability targeting option ID.
+    /// The DV360 viewability enum value
+    /// (e.g., <c>"VIEWABILITY_40_PERCENT_OR_MORE"</c>).
     /// </summary>
     public required string TargetingOptionId { get; set; }
 }

@@ -4,7 +4,7 @@ using Suss.Dv360.Client.Models;
 namespace Suss.Dv360.Client.Services;
 
 /// <summary>
-/// Orchestrates the Phase 1 campaign creation workflow by coordinating the individual
+/// Orchestrates the campaign creation workflow by coordinating the individual
 /// resource services in the correct dependency order.
 /// <para>
 /// Execution flow:
