@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Suss.Dv360.Client/Suss.Dv360.Client.csproj" />
+  <Project Path="Suss.Dv360.Console/Suss.Dv360.Console.csproj" />
+</Solution>

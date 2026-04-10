@@ -1,0 +1,26 @@
+# =============================================================================
+# .gitignore — Suss.Dv360.Console project
+#
+# This project is a smoke-test harness that may contain real credentials,
+# uploaded asset files, and local configuration overrides. These must never
+# be committed to source control.
+# =============================================================================
+
+# ----- Google credentials -----
+# Service account key files dropped into the project directory for local testing.
+service-account-key.json
+client_secret*.json
+*.p12
+
+# ----- OAuth token store -----
+# Persisted refresh tokens created by the OAuthUserAuthProvider.
+tokens/
+
+# ----- Local asset files -----
+# Test images/videos/HTML5 bundles used for creative upload smoke tests.
+# Commit only sample/placeholder assets if needed; never large media files.
+assets/
+
+# ----- Local configuration overrides -----
+appsettings.Development.json
+appsettings.Local.json

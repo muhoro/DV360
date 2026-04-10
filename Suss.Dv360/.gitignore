@@ -1,0 +1,99 @@
+# =============================================================================
+# .gitignore — Suss.Dv360 solution (Visual Studio / .NET 10 / C#)
+# =============================================================================
+
+# ----- Build outputs -----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# ----- NuGet packages -----
+# Restore creates these; they should not be committed.
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ----- Visual Studio -----
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# Visual Studio cache/options directory
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# MSTest test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]ocal/
+
+# ----- .NET / Roslyn -----
+*.DotSettings.user
+Generated\ Files/
+
+# ----- Rider / JetBrains -----
+.idea/
+*.sln.iml
+
+# ----- User-specific files -----
+*.pidb
+*.svclog
+*.scc
+
+# ----- OS files -----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----- Secrets & credentials -----
+# Google service account keys — NEVER commit these.
+**/service-account-key.json
+**/client_secret*.json
+**/*.p12
+
+# OAuth token store directories
+**/tokens/
+
+# Local environment overrides
+appsettings.Development.json
+appsettings.Local.json
+*.env
+.env.*
+
+# ----- Test coverage -----
+coverage/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+lcov.info
+
+# ----- Publish / deploy -----
+publish/
+*.azurite/
