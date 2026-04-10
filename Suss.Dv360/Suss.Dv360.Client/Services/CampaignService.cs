@@ -59,13 +59,15 @@ internal sealed class CampaignService(
                 },
                 FrequencyCap = new GoogleData.FrequencyCap
                 {
-                    Unlimited = true
+                    Unlimited = true,
+                    //TimeUnit = "TIME_UNIT_LIFETIME"
                 },
                 // DV360 API v4 requires at least one CampaignBudget with a valid date range.
                 CampaignBudgets =
                 [
                     new GoogleData.CampaignBudget
                     {
+                        DisplayName = "Total Campaign Budget", // <--- Likely MISSING
                         BudgetAmountMicros = campaign.BudgetAmountMicros,
                         BudgetUnit = campaign.BudgetUnit,
                         ExternalBudgetSource = "EXTERNAL_BUDGET_SOURCE_NONE",

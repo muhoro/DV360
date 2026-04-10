@@ -65,7 +65,17 @@ internal sealed class LineItemService(
                         : null
                 },
                 // DV360 API v4 requires a bid strategy on every line item.
-                BidStrategy = MapBidStrategyToGoogle(lineItem)
+                BidStrategy = MapBidStrategyToGoogle(lineItem),
+                FrequencyCap = new GoogleData.FrequencyCap
+                {
+                    Unlimited = true,
+                    //TimeUnit = "TIME_UNIT_LIFETIME"
+                },
+                PartnerRevenueModel = new GoogleData.PartnerRevenueModel
+                {
+                    MarkupType = "PARTNER_REVENUE_MODEL_MARKUP_TYPE_TOTAL_MEDIA_COST_MARKUP",
+                    MarkupAmount = 0
+                }
             };
 
             var request = service.Advertisers.LineItems.Create(body, advertiserId);

@@ -59,7 +59,7 @@ public sealed class Dv360InsertionOrder
     /// Controls the pacing time period (e.g., <c>"PACING_PERIOD_DAILY"</c>, <c>"PACING_PERIOD_FLIGHT"</c>).
     /// Defaults to <c>"PACING_PERIOD_DAILY"</c>.
     /// </summary>
-    public string PacingPeriod { get; set; } = "PACING_PERIOD_DAILY";
+    public string PacingPeriod { get; set; } = "PACING_PERIOD_FLIGHT";
 
     /// <summary>
     /// Controls the pacing algorithm (e.g., <c>"PACING_TYPE_EVEN"</c>, <c>"PACING_TYPE_AHEAD"</c>).
@@ -86,4 +86,15 @@ public sealed class Dv360InsertionOrder
     /// For example, 1 000 000 micros = $1.00 CPM target. <c>null</c> for percentage-based KPIs.
     /// </summary>
     public long? KpiAmountMicros { get; set; }
+
+    /// <summary>
+    /// The optimization objective for the insertion order (e.g., <c>"OPT_OBJECTIVE_BALANCED_SCHEDULE"</c>,
+    /// <c>"OPT_OBJECTIVE_FAVOR_NEW_CUSTOMER"</c>, <c>"OPT_OBJECTIVE_CUSTOM_ALGO"</c>).
+    /// Required by the DV360 API v4 when creating an insertion order.
+    /// Defaults to <c>"OPT_OBJECTIVE_BALANCED_SCHEDULE"</c>.
+    /// </summary>
+    public string OptimizationObjective { get; set; } = "NO_OBJECTIVE";
+
+    public string TimeUnit { get; set; } = "TIME_UNIT_LIFETIME";
+    //TIME_UNIT_LIFETIME
 }

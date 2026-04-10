@@ -25,7 +25,7 @@ builder.Services.AddDv360Client(options =>
 {
     var config = builder.Configuration.GetSection("Dv360");
 
-    options.AuthMode = Enum.Parse<AuthMode>(config["AuthMode"] ?? "ServiceAccount");
+    options.AuthMode = Enum.Parse<AuthMode>(config["AuthMode"] ?? "OAuthUser");
     options.ServiceAccountKeyPath = config["ServiceAccountKeyPath"];
     options.OAuthClientId = config["OAuthClientId"];
     options.OAuthClientSecret = config["OAuthClientSecret"];
@@ -49,13 +49,15 @@ var request = new CampaignWorkflowRequest
     AdvertiserId = advertiserId,
     Campaign = new Dv360Campaign
     {
-        DisplayName = "Test Campaign",
+        DisplayName = $"Test Campaign {Guid.NewGuid()}",
         GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
         PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
         PerformanceGoalAmountMicros = 1_000_000,              // $1.00 CPM target
-        BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
-        StartDate = DateOnly.FromDateTime(DateTime.Today),
-        EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1))
+        BudgetAmountMicros = 1_000_000_000,                  // $1,000.00 total budget
+        StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+        EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
+        EntityStatus = "ENTITY_STATUS_PAUSED",
+        //BudgetUnit = "BUDGET_UNIT_CURRENCY",
     },
     Creatives =
     [
@@ -88,11 +90,12 @@ var request = new CampaignWorkflowRequest
     InsertionOrder = new Dv360InsertionOrder
     {
         DisplayName = "Test Insertion Order",
-        BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
-        StartDate = DateOnly.FromDateTime(DateTime.Today),
-        EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
-        PacingPeriod = "PACING_PERIOD_DAILY",
-        PacingType = "PACING_TYPE_AHEAD",
+        EntityStatus = "ENTITY_STATUS_DRAFT",
+        BudgetAmountMicros = 1_000_000_000,                  // $1,000.00 total budget
+        StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+        EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
+        PacingPeriod = "PACING_PERIOD_FLIGHT",
+        PacingType = "PACING_TYPE_AHEAD", // PACING_PERIOD_FLIGHT
         DailyMaxMicros = 500_000_000,                         // $500.00 daily cap
         KpiType = "KPI_TYPE_CPM",
         KpiAmountMicros = 1_000_000                           // $1.00 CPM target
@@ -102,14 +105,35 @@ var request = new CampaignWorkflowRequest
         new Dv360LineItem
         {
             DisplayName = "Test Line Item",
+            EntityStatus = "ENTITY_STATUS_DRAFT",
             LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
-            MaxBudgetAmountMicros = 5_000_000_000,            // $5,000.00 max line item budget
-            StartDate = DateOnly.FromDateTime(DateTime.Today),
-            EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
-            PacingPeriod = "PACING_PERIOD_DAILY",
-            PacingType = "PACING_TYPE_AHEAD",
+            MaxBudgetAmountMicros = 1_000_000_000,            // $5,000.00 max line item budget
+            StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+            EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
+            PacingPeriod = "PACING_PERIOD_FLIGHT",
+            PacingType = "PACING_TYPE_AHEAD", // PACING_PERIOD_FLIGHT
             DailyMaxMicros = 250_000_000,                     // $250.00 daily cap
-            FixedBidAmountMicros = 2_000_000                  // $2.00 fixed CPM bid
+            FixedBidAmountMicros = 2_000_000,                 // $2.00 fixed CPM bid
+            Targeting = new Dv360LineItemTargeting
+            {
+                // Target United States (geo-region ID 2840).
+                GeoTargets =
+                [
+                    new Dv360GeoTargeting { TargetingOptionId = "2840", Negative = false }
+                ],
+                // Target desktop and mobile devices.
+                DeviceTypeTargets =
+                [
+                    new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_COMPUTER" },
+                    new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" }
+                ],
+                // Exclude sexually suggestive and profanity content for brand safety.
+                ContentLabelExclusions =
+                [
+                    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE" },
+                    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_PROFANITY" }
+                ]
+            }
         }
     ]
 };

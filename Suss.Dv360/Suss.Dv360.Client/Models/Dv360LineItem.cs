@@ -105,4 +105,14 @@ public sealed class Dv360LineItem
     /// <c>null</c> for uncapped auto-bidding.
     /// </summary>
     public long? MaxAverageCpmBidAmountMicros { get; set; }
+
+    /// <summary>
+    /// Optional targeting parameters to assign to this line item after creation.
+    /// <para>
+    /// When not <c>null</c>, the workflow will create <c>AssignedTargetingOption</c> resources
+    /// for each configured targeting type via the DV360 API. Leave <c>null</c> to skip
+    /// targeting assignment (the line item will use default/inherited targeting).
+    /// </para>
+    /// </summary>
+    public Dv360LineItemTargeting? Targeting { get; set; }
 }
