@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Suss.Dv360.Client.Exceptions;
 using Suss.Dv360.Client.Infrastructure;
 using Suss.Dv360.Client.Models;
-using GoogleData = Google.Apis.DisplayVideo.v3.Data;
+using GoogleData = Google.Apis.DisplayVideo.v4.Data;
 
 namespace Suss.Dv360.Client.Services;
 
@@ -56,7 +56,26 @@ internal sealed class CampaignService(
                         StartDate = GoogleTypeMapper.ToGoogleDate(campaign.StartDate),
                         EndDate = GoogleTypeMapper.ToGoogleDate(campaign.EndDate)
                     }
-                }
+                },
+                FrequencyCap = new GoogleData.FrequencyCap
+                {
+                    Unlimited = true
+                },
+                // DV360 API v4 requires at least one CampaignBudget with a valid date range.
+                CampaignBudgets =
+                [
+                    new GoogleData.CampaignBudget
+                    {
+                        BudgetAmountMicros = campaign.BudgetAmountMicros,
+                        BudgetUnit = campaign.BudgetUnit,
+                        ExternalBudgetSource = "EXTERNAL_BUDGET_SOURCE_NONE",
+                        DateRange = new GoogleData.DateRange
+                        {
+                            StartDate = GoogleTypeMapper.ToGoogleDate(campaign.StartDate),
+                            EndDate = GoogleTypeMapper.ToGoogleDate(campaign.EndDate)
+                        }
+                    }
+                ]
             };
 
             var request = service.Advertisers.Campaigns.Create(body, advertiserId);
@@ -131,15 +150,23 @@ internal sealed class CampaignService(
     /// Maps a Google SDK <see cref="GoogleData.Campaign"/> to the library’s flat
     /// <see cref="Dv360Campaign"/> model by extracting nested goal and flight data.
     /// </summary>
-    private static Dv360Campaign MapFromGoogle(GoogleData.Campaign c) => new()
+    private static Dv360Campaign MapFromGoogle(GoogleData.Campaign c)
     {
-        CampaignId = c.CampaignId,
-        DisplayName = c.DisplayName ?? string.Empty,
-        EntityStatus = c.EntityStatus ?? "ENTITY_STATUS_UNSPECIFIED",
-        GoalType = c.CampaignGoal?.CampaignGoalType ?? string.Empty,
-        PerformanceGoalType = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalType,
-        PerformanceGoalAmountMicros = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalAmountMicros,
-        StartDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.StartDate),
-        EndDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.EndDate)
-    };
+        // Use the first budget for the flat model.
+        var budget = c.CampaignBudgets?.FirstOrDefault();
+
+        return new()
+        {
+            CampaignId = c.CampaignId,
+            DisplayName = c.DisplayName ?? string.Empty,
+            EntityStatus = c.EntityStatus ?? "ENTITY_STATUS_UNSPECIFIED",
+            GoalType = c.CampaignGoal?.CampaignGoalType ?? string.Empty,
+            PerformanceGoalType = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalType,
+            PerformanceGoalAmountMicros = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalAmountMicros,
+            BudgetUnit = budget?.BudgetUnit ?? "BUDGET_UNIT_CURRENCY",
+            BudgetAmountMicros = budget?.BudgetAmountMicros ?? 0,
+            StartDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.StartDate),
+            EndDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.EndDate)
+        };
+    }
 }

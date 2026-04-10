@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Suss.Dv360.Client.Exceptions;
 using Suss.Dv360.Client.Infrastructure;
 using Suss.Dv360.Client.Models;
-using GoogleData = Google.Apis.DisplayVideo.v3.Data;
+using GoogleData = Google.Apis.DisplayVideo.v4.Data;
 
 namespace Suss.Dv360.Client.Services;
 

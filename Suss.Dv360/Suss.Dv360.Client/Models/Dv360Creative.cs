@@ -67,4 +67,14 @@ public sealed class Dv360Creative
     /// </para>
     /// </summary>
     public List<Dv360CreativeAsset>? Assets { get; set; }
+
+    /// <summary>
+    /// The exit events (click-through URLs) for this creative.
+    /// <para>
+    /// The DV360 API requires every creative to have at least one exit event.
+    /// Each exit event defines a landing page URL that users are directed to when
+    /// they click on the creative.
+    /// </para>
+    /// </summary>
+    public List<Dv360ExitEvent>? ExitEvents { get; set; }
 }

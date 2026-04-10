@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Suss.Dv360.Client.Exceptions;
 using Suss.Dv360.Client.Infrastructure;
 using Suss.Dv360.Client.Models;
-using GoogleData = Google.Apis.DisplayVideo.v3.Data;
+using GoogleData = Google.Apis.DisplayVideo.v4.Data;
 
 namespace Suss.Dv360.Client.Services;
 
@@ -72,7 +72,9 @@ internal sealed class CreativeService(
                     : null,
                 ThirdPartyTag = creative.ThirdPartyTag,
                 // Wire uploaded asset MediaIds into the creative's AssetAssociation list.
-                Assets = MapAssetsToGoogle(creative.Assets)
+                Assets = MapAssetsToGoogle(creative.Assets),
+                // Wire exit events (click-through URLs) — DV360 requires at least one.
+                ExitEvents = MapExitEventsToGoogle(creative.ExitEvents)
             };
 
             var request = service.Advertisers.Creatives.Create(body, advertiserId);
@@ -174,23 +176,6 @@ internal sealed class CreativeService(
     }
 
     /// <summary>
-    /// Maps a Google SDK <see cref="GoogleData.Creative"/> to the library's flat
-    /// <see cref="Dv360Creative"/> model by extracting nested dimension and asset data.
-    /// </summary>
-    private static Dv360Creative MapFromGoogle(GoogleData.Creative c) => new()
-    {
-        CreativeId = c.CreativeId,
-        DisplayName = c.DisplayName ?? string.Empty,
-        EntityStatus = c.EntityStatus ?? "ENTITY_STATUS_UNSPECIFIED",
-        CreativeType = c.CreativeType ?? string.Empty,
-        HostingSource = c.HostingSource,
-        WidthPixels = c.Dimensions?.WidthPixels,
-        HeightPixels = c.Dimensions?.HeightPixels,
-        ThirdPartyTag = c.ThirdPartyTag,
-        Assets = MapAssetsFromGoogle(c.Assets)
-    };
-
-    /// <summary>
     /// Maps the Google SDK's <see cref="GoogleData.AssetAssociation"/> list back to
     /// <see cref="Dv360CreativeAsset"/> entries with <c>MediaId</c>, <c>Content</c>,
     /// and <c>Role</c> populated.
@@ -205,6 +190,56 @@ internal sealed class CreativeService(
             MediaId = a.Asset?.MediaId,
             Content = a.Asset?.Content,
             Role = a.Role ?? "ASSET_ROLE_UNSPECIFIED"
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Maps a Google SDK <see cref="GoogleData.Creative"/> to the library's flat
+    /// <see cref="Dv360Creative"/> model by extracting nested dimension and asset data.
+    /// </summary>
+    private static Dv360Creative MapFromGoogle(GoogleData.Creative c) => new()
+    {
+        CreativeId = c.CreativeId,
+        DisplayName = c.DisplayName ?? string.Empty,
+        EntityStatus = c.EntityStatus ?? "ENTITY_STATUS_UNSPECIFIED",
+        CreativeType = c.CreativeType ?? string.Empty,
+        HostingSource = c.HostingSource,
+        WidthPixels = c.Dimensions?.WidthPixels,
+        HeightPixels = c.Dimensions?.HeightPixels,
+        ThirdPartyTag = c.ThirdPartyTag,
+        Assets = MapAssetsFromGoogle(c.Assets),
+        ExitEvents = MapExitEventsFromGoogle(c.ExitEvents)
+    };
+
+    /// <summary>
+    /// Converts <see cref="Dv360ExitEvent"/> entries into the Google SDK's
+    /// <see cref="GoogleData.ExitEvent"/> list.
+    /// </summary>
+    private static IList<GoogleData.ExitEvent>? MapExitEventsToGoogle(List<Dv360ExitEvent>? exitEvents)
+    {
+        if (exitEvents is not { Count: > 0 })
+            return null;
+
+        return exitEvents.Select(e => new GoogleData.ExitEvent
+        {
+            Type = e.Type,
+            Url = e.Url
+        }).ToList<GoogleData.ExitEvent>();
+    }
+
+    /// <summary>
+    /// Maps the Google SDK's <see cref="GoogleData.ExitEvent"/> list back to
+    /// <see cref="Dv360ExitEvent"/> entries.
+    /// </summary>
+    private static List<Dv360ExitEvent>? MapExitEventsFromGoogle(IList<GoogleData.ExitEvent>? exitEvents)
+    {
+        if (exitEvents is not { Count: > 0 })
+            return null;
+
+        return exitEvents.Select(e => new Dv360ExitEvent
+        {
+            Type = e.Type ?? "EXIT_EVENT_TYPE_DEFAULT",
+            Url = e.Url ?? string.Empty
         }).ToList();
     }
 }
