@@ -53,6 +53,7 @@ var request = new CampaignWorkflowRequest
         GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
         PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
         PerformanceGoalAmountMicros = 1_000_000,              // $1.00 CPM target
+        BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
         StartDate = DateOnly.FromDateTime(DateTime.Today),
         EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1))
     },
@@ -65,6 +66,14 @@ var request = new CampaignWorkflowRequest
             HostingSource = "HOSTING_SOURCE_HOSTED",
             WidthPixels = 300,
             HeightPixels = 250,
+            ExitEvents =
+            [
+                new Dv360ExitEvent
+                {
+                    Type = "EXIT_EVENT_TYPE_DEFAULT",
+                    Url = "https://docs.google.com/forms/d/e/1FAIpQLScUi3Mgz5zBGaIgUR_Z4po5bGWwGkH9fE0Ugh85yyVUjAyOtg/viewform"
+                }
+            ],
             Assets =
             [
                 new Dv360CreativeAsset

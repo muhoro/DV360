@@ -1,4 +1,4 @@
-using GoogleData = Google.Apis.DisplayVideo.v3.Data;
+using GoogleData = Google.Apis.DisplayVideo.v4.Data;
 
 namespace Suss.Dv360.Client.Infrastructure;
 

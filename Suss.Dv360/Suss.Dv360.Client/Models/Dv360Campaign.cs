@@ -45,6 +45,19 @@ public sealed class Dv360Campaign
     public long? PerformanceGoalAmountMicros { get; set; }
 
     /// <summary>
+    /// The budget unit type for the campaign budget
+    /// (e.g., <c>"BUDGET_UNIT_CURRENCY"</c>, <c>"BUDGET_UNIT_IMPRESSIONS"</c>).
+    /// Defaults to <c>"BUDGET_UNIT_CURRENCY"</c>.
+    /// </summary>
+    public string BudgetUnit { get; set; } = "BUDGET_UNIT_CURRENCY";
+
+    /// <summary>
+    /// The total campaign budget amount in micros (1/1,000,000 of the currency unit).
+    /// For example, 10 000 000 000 micros = $10,000.00.
+    /// </summary>
+    public long BudgetAmountMicros { get; set; }
+
+    /// <summary>
     /// The planned start date of the campaign flight. <c>null</c> for open-ended campaigns.
     /// </summary>
     public DateOnly? StartDate { get; set; }
