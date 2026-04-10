@@ -79,7 +79,30 @@ public sealed class Dv360LineItem
     public string PacingType { get; set; } = "PACING_TYPE_EVEN";
 
     /// <summary>
-    /// The maximum daily spend in micros when pacing period is daily.
+    /// The maximum daily spend in micros when pacing period is daily
+    /// and pacing type is <c>"PACING_TYPE_AHEAD"</c>. Not used with <c>"PACING_TYPE_EVEN"</c>.
     /// </summary>
     public long DailyMaxMicros { get; set; }
+
+    /// <summary>
+    /// The fixed bid amount in micros for a <c>FixedBidStrategy</c>.
+    /// When set, the line item uses a fixed CPM bid. Mutually exclusive with
+    /// <see cref="MaximizeSpendPerformanceGoalType"/>.
+    /// </summary>
+    public long? FixedBidAmountMicros { get; set; }
+
+    /// <summary>
+    /// The performance goal type for a <c>MaximizeSpendBidStrategy</c>
+    /// (e.g., <c>"BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_CPC"</c>,
+    /// <c>"BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_VIEWABLE_CPM"</c>).
+    /// When set, the line item uses auto-bidding to maximize spend. Mutually exclusive with
+    /// <see cref="FixedBidAmountMicros"/>.
+    /// </summary>
+    public string? MaximizeSpendPerformanceGoalType { get; set; }
+
+    /// <summary>
+    /// Optional cap on the average CPM bid in micros when using <c>MaximizeSpendBidStrategy</c>.
+    /// <c>null</c> for uncapped auto-bidding.
+    /// </summary>
+    public long? MaxAverageCpmBidAmountMicros { get; set; }
 }

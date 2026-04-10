@@ -68,7 +68,22 @@ public sealed class Dv360InsertionOrder
     public string PacingType { get; set; } = "PACING_TYPE_EVEN";
 
     /// <summary>
-    /// The maximum daily spend in micros when pacing period is <c>"PACING_PERIOD_DAILY"</c>.
+    /// The maximum daily spend in micros when pacing period is <c>"PACING_PERIOD_DAILY"</c>
+    /// and pacing type is <c>"PACING_TYPE_AHEAD"</c>. Not used with <c>"PACING_TYPE_EVEN"</c>.
     /// </summary>
     public long DailyMaxMicros { get; set; }
+
+    /// <summary>
+    /// The KPI type for measuring insertion order performance (e.g., <c>"KPI_TYPE_CPM"</c>,
+    /// <c>"KPI_TYPE_CPC"</c>, <c>"KPI_TYPE_VIEWABILITY"</c>).
+    /// Required by the DV360 API v4 when creating an insertion order.
+    /// Defaults to <c>"KPI_TYPE_CPM"</c>.
+    /// </summary>
+    public string KpiType { get; set; } = "KPI_TYPE_CPM";
+
+    /// <summary>
+    /// The KPI goal amount in micros for currency-based KPIs (e.g., CPM, CPC).
+    /// For example, 1 000 000 micros = $1.00 CPM target. <c>null</c> for percentage-based KPIs.
+    /// </summary>
+    public long? KpiAmountMicros { get; set; }
 }

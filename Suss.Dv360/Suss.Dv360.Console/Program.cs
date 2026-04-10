@@ -91,7 +91,11 @@ var request = new CampaignWorkflowRequest
         BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
         StartDate = DateOnly.FromDateTime(DateTime.Today),
         EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
-        DailyMaxMicros = 500_000_000                          // $500.00 daily cap
+        PacingPeriod = "PACING_PERIOD_DAILY",
+        PacingType = "PACING_TYPE_AHEAD",
+        DailyMaxMicros = 500_000_000,                         // $500.00 daily cap
+        KpiType = "KPI_TYPE_CPM",
+        KpiAmountMicros = 1_000_000                           // $1.00 CPM target
     },
     LineItems =
     [
@@ -102,7 +106,10 @@ var request = new CampaignWorkflowRequest
             MaxBudgetAmountMicros = 5_000_000_000,            // $5,000.00 max line item budget
             StartDate = DateOnly.FromDateTime(DateTime.Today),
             EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
-            DailyMaxMicros = 250_000_000                      // $250.00 daily cap
+            PacingPeriod = "PACING_PERIOD_DAILY",
+            PacingType = "PACING_TYPE_AHEAD",
+            DailyMaxMicros = 250_000_000,                     // $250.00 daily cap
+            FixedBidAmountMicros = 2_000_000                  // $2.00 fixed CPM bid
         }
     ]
 };

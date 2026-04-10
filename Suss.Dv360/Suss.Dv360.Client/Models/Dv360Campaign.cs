@@ -22,10 +22,11 @@ public sealed class Dv360Campaign
     public required string DisplayName { get; set; }
 
     /// <summary>
-    /// The entity lifecycle status (e.g., <c>"ENTITY_STATUS_ACTIVE"</c>, <c>"ENTITY_STATUS_PAUSED"</c>).
-    /// Defaults to <c>"ENTITY_STATUS_ACTIVE"</c>.
+    /// The entity lifecycle status (e.g., <c>"ENTITY_STATUS_PAUSED"</c>, <c>"ENTITY_STATUS_ACTIVE"</c>).
+    /// Defaults to <c>"ENTITY_STATUS_PAUSED"</c> because the DV360 API does not allow creating
+    /// campaigns directly in active status.
     /// </summary>
-    public string EntityStatus { get; set; } = "ENTITY_STATUS_ACTIVE";
+    public string EntityStatus { get; set; } = "ENTITY_STATUS_PAUSED";
 
     /// <summary>
     /// The high-level campaign goal type (e.g., <c>"CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS"</c>).

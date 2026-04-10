@@ -59,7 +59,15 @@ internal sealed class InsertionOrderService(
                 {
                     PacingPeriod = insertionOrder.PacingPeriod,
                     PacingType = insertionOrder.PacingType,
-                    DailyMaxMicros = insertionOrder.DailyMaxMicros
+                    DailyMaxMicros = insertionOrder.PacingType == "PACING_TYPE_AHEAD"
+                        ? insertionOrder.DailyMaxMicros
+                        : null
+                },
+                // DV360 API v4 requires a KPI on every insertion order.
+                Kpi = new GoogleData.Kpi
+                {
+                    KpiType = insertionOrder.KpiType,
+                    KpiAmountMicros = insertionOrder.KpiAmountMicros
                 }
             };
 
@@ -154,7 +162,9 @@ internal sealed class InsertionOrderService(
             EndDate = GoogleTypeMapper.FromGoogleDate(segment?.DateRange?.EndDate),
             PacingPeriod = io.Pacing?.PacingPeriod ?? "PACING_PERIOD_UNSPECIFIED",
             PacingType = io.Pacing?.PacingType ?? "PACING_TYPE_UNSPECIFIED",
-            DailyMaxMicros = io.Pacing?.DailyMaxMicros ?? 0
+            DailyMaxMicros = io.Pacing?.DailyMaxMicros ?? 0,
+            KpiType = io.Kpi?.KpiType ?? "KPI_TYPE_UNSPECIFIED",
+            KpiAmountMicros = io.Kpi?.KpiAmountMicros
         };
     }
 }

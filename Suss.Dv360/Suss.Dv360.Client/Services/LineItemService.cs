@@ -60,8 +60,12 @@ internal sealed class LineItemService(
                 {
                     PacingPeriod = lineItem.PacingPeriod,
                     PacingType = lineItem.PacingType,
-                    DailyMaxMicros = lineItem.DailyMaxMicros
-                }
+                    DailyMaxMicros = lineItem.PacingType == "PACING_TYPE_AHEAD"
+                        ? lineItem.DailyMaxMicros
+                        : null
+                },
+                // DV360 API v4 requires a bid strategy on every line item.
+                BidStrategy = MapBidStrategyToGoogle(lineItem)
             };
 
             var request = service.Advertisers.LineItems.Create(body, advertiserId);
@@ -141,15 +145,20 @@ internal sealed class LineItemService(
         {
             var service = await serviceFactory.CreateAsync(cancellationToken);
 
-            // Retrieve the current line item to update its creative assignments.
+            // Retrieve the current line item to read its existing creative assignments.
             var getRequest = service.Advertisers.LineItems.Get(advertiserId, lineItemId);
             var lineItem = await getRequest.ExecuteAsync(cancellationToken);
 
-            // NOTE: The exact mechanism for creative-to-line-item association depends on
-            // the DV360 API version and your account configuration. Adjust the update mask
-            // and fields below based on the actual DV360 API creative assignment model.
+            // Add the creative ID to the list if not already present.
+            var creativeIds = lineItem.CreativeIds?.ToList() ?? [];
+            if (!creativeIds.Contains(creativeId))
+                creativeIds.Add(creativeId);
+
+            lineItem.CreativeIds = creativeIds;
+
+            // Patch the line item with the updated creative assignments.
             var patchRequest = service.Advertisers.LineItems.Patch(lineItem, advertiserId, lineItemId);
-            patchRequest.UpdateMask = "entityStatus";
+            patchRequest.UpdateMask = "creativeIds";
             await patchRequest.ExecuteAsync(cancellationToken);
 
             logger.LogInformation("Assigned creative {CreativeId} to line item {LineItemId}", creativeId, lineItemId);
@@ -180,6 +189,43 @@ internal sealed class LineItemService(
         EndDate = GoogleTypeMapper.FromGoogleDate(li.Flight?.DateRange?.EndDate),
         PacingPeriod = li.Pacing?.PacingPeriod ?? string.Empty,
         PacingType = li.Pacing?.PacingType ?? string.Empty,
-        DailyMaxMicros = li.Pacing?.DailyMaxMicros ?? 0
+        DailyMaxMicros = li.Pacing?.DailyMaxMicros ?? 0,
+        FixedBidAmountMicros = li.BidStrategy?.FixedBid?.BidAmountMicros,
+        MaximizeSpendPerformanceGoalType = li.BidStrategy?.MaximizeSpendAutoBid?.PerformanceGoalType,
+        MaxAverageCpmBidAmountMicros = li.BidStrategy?.MaximizeSpendAutoBid?.MaxAverageCpmBidAmountMicros
     };
+
+    /// <summary>
+    /// Maps the flat bid strategy properties from <see cref="Dv360LineItem"/> to the Google SDK's
+    /// polymorphic <see cref="GoogleData.BiddingStrategy"/>. Uses <c>FixedBidStrategy</c> when
+    /// <see cref="Dv360LineItem.FixedBidAmountMicros"/> is set, otherwise <c>MaximizeSpendBidStrategy</c>
+    /// when <see cref="Dv360LineItem.MaximizeSpendPerformanceGoalType"/> is set.
+    /// </summary>
+    private static GoogleData.BiddingStrategy? MapBidStrategyToGoogle(Dv360LineItem lineItem)
+    {
+        if (lineItem.FixedBidAmountMicros is not null)
+        {
+            return new GoogleData.BiddingStrategy
+            {
+                FixedBid = new GoogleData.FixedBidStrategy
+                {
+                    BidAmountMicros = lineItem.FixedBidAmountMicros
+                }
+            };
+        }
+
+        if (lineItem.MaximizeSpendPerformanceGoalType is not null)
+        {
+            return new GoogleData.BiddingStrategy
+            {
+                MaximizeSpendAutoBid = new GoogleData.MaximizeSpendBidStrategy
+                {
+                    PerformanceGoalType = lineItem.MaximizeSpendPerformanceGoalType,
+                    MaxAverageCpmBidAmountMicros = lineItem.MaxAverageCpmBidAmountMicros
+                }
+            };
+        }
+
+        return null;
+    }
 }
