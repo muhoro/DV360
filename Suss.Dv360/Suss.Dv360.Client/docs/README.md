@@ -1,0 +1,1733 @@
+# Suss.Dv360.Client — Developer Documentation
+
+> **A .NET 10 client library for Google Display & Video 360 API v4**
+>
+> This library provides a high-level, dependency-injection-friendly wrapper around the
+> Google DV360 API. It abstracts away the nested Google SDK types and exposes a flat,
+> intuitive model for managing campaigns, insertion orders, line items, creatives, and
+> targeting — all through strongly-typed C# interfaces.
+
+---
+
+## Table of Contents
+
+1. [Installation & Prerequisites](#1-installation--prerequisites)
+2. [Quick Start](#2-quick-start)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Authentication](#4-authentication)
+5. [Configuration Reference](#5-configuration-reference)
+6. [Service Reference](#6-service-reference)
+   - [ICampaignWorkflowService](#61-icampaignworkflowservice)
+   - [ICampaignService](#62-icampaignservice)
+   - [ICreativeService](#63-icreativeservice)
+   - [IInsertionOrderService](#64-iinsertionorderservice)
+   - [ILineItemService](#65-ilineitemservice)
+   - [ITargetingService](#66-itargetingservice)
+   - [IGeoRegionService](#67-igeoregionservice)
+   - [IAssetService](#68-iassetservice)
+7. [Model Reference](#7-model-reference)
+   - [Dv360Campaign](#71-dv360campaign)
+   - [Dv360InsertionOrder](#72-dv360insertionorder)
+   - [Dv360LineItem](#73-dv360lineitem)
+   - [Dv360Creative](#74-dv360creative)
+   - [Dv360CreativeAsset](#75-dv360creativeasset)
+   - [Dv360ExitEvent](#76-dv360exitevent)
+   - [Dv360LineItemTargeting](#77-dv360lineitemtargeting)
+   - [Dv360GeoRegion](#78-dv360georegion)
+   - [CampaignWorkflowRequest](#79-campaignworkflowrequest)
+   - [CampaignWorkflowResult](#710-campaignworkflowresult)
+   - [CampaignListOptions](#711-campaignlistoptions)
+   - [LineItemListOptions](#712-lineitemlistoptions)
+8. [Enum Value Reference](#8-enum-value-reference)
+9. [Campaign Creation Workflow](#9-campaign-creation-workflow)
+10. [Complete Usage Examples](#10-complete-usage-examples)
+11. [Error Handling](#11-error-handling)
+12. [Micros Conversion Guide](#12-micros-conversion-guide)
+
+---
+
+## 1. Installation & Prerequisites
+
+### NuGet Package Dependencies
+
+The library depends on:
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `Google.Apis.DisplayVideo.v4` | `1.73.0.4107` | Google DV360 API v4 SDK |
+| `Microsoft.Extensions.DependencyInjection.Abstractions` | `10.0.5` | DI container abstractions |
+| `Microsoft.Extensions.Logging.Abstractions` | `10.0.5` | Logging abstractions |
+| `Microsoft.Extensions.Options` | `10.0.5` | Options pattern support |
+
+### Target Framework
+
+- **.NET 10** (`net10.0`)
+
+### Project Reference
+
+Add a project reference from your consuming project:
+
+```xml
+<ProjectReference Include="..\Suss.Dv360.Client\Suss.Dv360.Client.csproj" />
+```
+
+### Google Cloud Prerequisites
+
+1. A **Google Cloud project** with the Display & Video 360 API enabled.
+2. Either:
+   - A **Service Account** JSON key file (for server-to-server auth), **or**
+   - **OAuth 2.0 Client ID + Secret** (for interactive user auth).
+3. The credentials must have access to the DV360 advertiser you want to manage.
+
+---
+
+## 2. Quick Start
+
+### Step 1: Register Services
+
+```csharp
+using Suss.Dv360.Client.Configuration;
+
+builder.Services.AddDv360Client(options =>
+{
+    options.AuthMode = AuthMode.ServiceAccount;
+    options.ServiceAccountKeyPath = "/path/to/service-account-key.json";
+});
+```
+
+### Step 2: Inject and Use
+
+```csharp
+using Suss.Dv360.Client.Services;
+using Suss.Dv360.Client.Models;
+
+public class MyCampaignManager(ICampaignWorkflowService workflow, IGeoRegionService geoService)
+{
+    public async Task CreateCampaignAsync(long advertiserId)
+    {
+        // Look up geo targeting by name
+        var kenya = await geoService.FindByNameAsync(advertiserId, "Kenya");
+
+        var request = new CampaignWorkflowRequest
+        {
+            AdvertiserId = advertiserId,
+            Campaign = new Dv360Campaign
+            {
+                DisplayName = "My First Campaign",
+                GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
+                PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
+                PerformanceGoalAmountMicros = 1_000_000,
+                BudgetAmountMicros = 1_000_000_000,
+                StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+                EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
+            },
+            Creatives = [ new Dv360Creative
+            {
+                DisplayName = "Banner 300x250",
+                CreativeType = "CREATIVE_TYPE_STANDARD",
+                HostingSource = "HOSTING_SOURCE_HOSTED",
+                WidthPixels = 300,
+                HeightPixels = 250,
+                ExitEvents = [ new Dv360ExitEvent { Url = "https://example.com" } ],
+                Assets = [ new Dv360CreativeAsset
+                {
+                    FilePath = "assets/banner.png",
+                    MimeType = "image/png",
+                    Role = "ASSET_ROLE_MAIN"
+                }]
+            }],
+            InsertionOrder = new Dv360InsertionOrder
+            {
+                DisplayName = "My Insertion Order",
+                BudgetAmountMicros = 1_000_000_000,
+                StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+                EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
+            },
+            LineItems = [ new Dv360LineItem
+            {
+                DisplayName = "My Line Item",
+                LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
+                MaxBudgetAmountMicros = 1_000_000_000,
+                StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
+                EndDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
+                FixedBidAmountMicros = 2_000_000,
+                Targeting = new Dv360LineItemTargeting
+                {
+                    GeoTargets = [ new Dv360GeoTargeting { TargetingOptionId = kenya!.TargetingOptionId } ],
+                    DeviceTypeTargets = [
+                        new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_COMPUTER" },
+                        new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" }
+                    ]
+                }
+            }]
+        };
+
+        var result = await workflow.ExecuteAsync(request);
+
+        Console.WriteLine($"Campaign ID: {result.Campaign.CampaignId}");
+        Console.WriteLine($"IO ID: {result.InsertionOrder.InsertionOrderId}");
+    }
+}
+```
+
+---
+
+## 3. Architecture Overview
+
+### DV360 Resource Hierarchy
+
+```
+Advertiser (external — not managed by this library)
+  ??? Campaign
+        ??? Insertion Order (IO)
+              ??? Line Item
+                    ??? Targeting Options (geo, device, browser, etc.)
+                    ??? Creative Assignments (linked creatives)
+  ??? Creative (independent of campaign, linked to line items)
+        ??? Assets (uploaded media files)
+```
+
+### Library Layering
+
+```
+??????????????????????????????????????????????????????
+?  Consumer Code (your project)                      ?
+??????????????????????????????????????????????????????
+?  ICampaignWorkflowService  (orchestrator)          ?
+?    ??? ICampaignService                            ?
+?    ??? ICreativeService                            ?
+?    ??? IInsertionOrderService                      ?
+?    ??? ILineItemService                            ?
+?    ??? ITargetingService                           ?
+?  IGeoRegionService  (standalone lookup)            ?
+?  IAssetService      (standalone upload)            ?
+??????????????????????????????????????????????????????
+?  Infrastructure                                    ?
+?    ??? DisplayVideoServiceFactory                  ?
+?    ??? GoogleTypeMapper                            ?
+?    ??? IDv360AuthProvider                          ?
+?          ??? ServiceAccountAuthProvider             ?
+?          ??? OAuthUserAuthProvider                  ?
+??????????????????????????????????????????????????????
+?  Google.Apis.DisplayVideo.v4 (Google SDK)          ?
+??????????????????????????????????????????????????????
+```
+
+### DI Lifetimes
+
+| Component | Lifetime | Reason |
+|-----------|----------|--------|
+| `IDv360AuthProvider` | Singleton | Caches credentials across requests |
+| `IDisplayVideoServiceFactory` | Singleton | Caches the authenticated SDK service |
+| `ICampaignService`, `ICreativeService`, etc. | Scoped | Per-request in ASP.NET Core |
+| `ICampaignWorkflowService` | Scoped | Coordinates scoped services |
+
+---
+
+## 4. Authentication
+
+The library supports two authentication strategies, configured via `AuthMode`:
+
+### Service Account (Server-to-Server)
+
+Best for production workloads, background services, and CI/CD pipelines. No user interaction required.
+
+```csharp
+builder.Services.AddDv360Client(options =>
+{
+    options.AuthMode = AuthMode.ServiceAccount;
+    options.ServiceAccountKeyPath = "/path/to/service-account-key.json";
+});
+```
+
+**Requirements:**
+- A Google Cloud service account JSON key file.
+- The service account must be granted access to the DV360 advertiser (via DV360 UI ? Admin ? Users).
+
+### OAuth 2.0 User Flow (Interactive)
+
+Best for developer tools, desktop utilities, and debugging. Opens a browser for consent on first run; refresh tokens are cached.
+
+```csharp
+builder.Services.AddDv360Client(options =>
+{
+    options.AuthMode = AuthMode.OAuthUser;
+    options.OAuthClientId = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+    options.OAuthClientSecret = "GOCSPX-your-client-secret";
+    options.TokenStorePath = "tokens";  // directory for refresh token cache
+});
+```
+
+**Requirements:**
+- OAuth 2.0 Client ID and Secret from Google Cloud Console (Credentials page).
+- The DV360 API must be enabled on the Google Cloud project.
+
+---
+
+## 5. Configuration Reference
+
+### `Dv360ClientOptions`
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `AuthMode` | `AuthMode` | `ServiceAccount` | Authentication strategy: `ServiceAccount` or `OAuthUser` |
+| `ServiceAccountKeyPath` | `string?` | `null` | Path to the JSON key file. **Required for `ServiceAccount`** |
+| `OAuthClientId` | `string?` | `null` | OAuth 2.0 client ID. **Required for `OAuthUser`** |
+| `OAuthClientSecret` | `string?` | `null` | OAuth 2.0 client secret. **Required for `OAuthUser`** |
+| `TokenStorePath` | `string` | `"tokens"` | Directory for cached OAuth refresh tokens |
+| `ApplicationName` | `string` | `"Suss.Dv360.Client"` | User-Agent string sent with every API request |
+
+### Configuration via `appsettings.json`
+
+```json
+{
+  "Dv360": {
+    "AuthMode": "OAuthUser",
+    "ServiceAccountKeyPath": "path/to/key.json",
+    "OAuthClientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "OAuthClientSecret": "GOCSPX-your-secret",
+    "TokenStorePath": "tokens",
+    "AdvertiserId": "8101501893"
+  }
+}
+```
+
+Bind it in code:
+
+```csharp
+builder.Services.AddDv360Client(options =>
+{
+    var config = builder.Configuration.GetSection("Dv360");
+    options.AuthMode = Enum.Parse<AuthMode>(config["AuthMode"] ?? "ServiceAccount");
+    options.ServiceAccountKeyPath = config["ServiceAccountKeyPath"];
+    options.OAuthClientId = config["OAuthClientId"];
+    options.OAuthClientSecret = config["OAuthClientSecret"];
+    options.TokenStorePath = config["TokenStorePath"] ?? "tokens";
+});
+```
+
+---
+
+## 6. Service Reference
+
+### 6.1 ICampaignWorkflowService
+
+**The primary entry point for end-to-end campaign creation.** Orchestrates all individual services in the correct dependency order.
+
+| Method | Description |
+|--------|-------------|
+| `ExecuteAsync(CampaignWorkflowRequest, CancellationToken)` | Executes the full 4-step workflow and returns a `CampaignWorkflowResult` |
+
+```csharp
+var result = await workflow.ExecuteAsync(request, cancellationToken);
+// result.Campaign.CampaignId       ? DV360-assigned campaign ID
+// result.InsertionOrder.InsertionOrderId ? DV360-assigned IO ID
+// result.LineItems[0].LineItemId    ? DV360-assigned line item IDs
+// result.Creatives[0].CreativeId    ? DV360-assigned creative IDs
+```
+
+---
+
+### 6.2 ICampaignService
+
+CRUD operations for DV360 campaigns.
+
+| Method | Description |
+|--------|-------------|
+| `CreateAsync(advertiserId, campaign, ct)` | Creates a campaign. Returns the campaign with `CampaignId` populated |
+| `GetAsync(advertiserId, campaignId, ct)` | Gets a campaign by ID. Returns `null` if not found |
+| `ListAsync(advertiserId, ct)` | Lists all campaigns for the advertiser |
+| `ListAsync(advertiserId, options, ct)` | Lists campaigns with filtering, sorting, and paging |
+| `PatchAsync(advertiserId, campaignId, campaign, ct)` | Updates an existing campaign |
+| `DeleteAsync(advertiserId, campaignId, ct)` | Permanently deletes a campaign |
+
+```csharp
+// Create
+var campaign = await campaignService.CreateAsync(advertiserId, new Dv360Campaign
+{
+    DisplayName = "Summer 2025 Campaign",
+    GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
+    PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
+    PerformanceGoalAmountMicros = 1_000_000,
+    BudgetAmountMicros = 10_000_000_000,
+    StartDate = new DateOnly(2025, 6, 1),
+    EndDate = new DateOnly(2025, 8, 31),
+});
+
+// List with filtering
+var activeCampaigns = await campaignService.ListAsync(advertiserId, new CampaignListOptions
+{
+    Filter = "entityStatus=\"ENTITY_STATUS_ACTIVE\"",
+    OrderBy = "updateTime desc",
+    PageSize = 50
+});
+
+// Update
+campaign.DisplayName = "Summer 2025 Campaign (Updated)";
+await campaignService.PatchAsync(advertiserId, campaign.CampaignId!.Value, campaign);
+
+// Delete
+await campaignService.DeleteAsync(advertiserId, campaign.CampaignId!.Value);
+```
+
+---
+
+### 6.3 ICreativeService
+
+CRUD operations for DV360 creatives. Handles asset upload automatically during creation.
+
+| Method | Description |
+|--------|-------------|
+| `CreateAsync(advertiserId, creative, ct)` | Creates a creative (uploads assets if hosted). Returns with `CreativeId` set |
+| `GetAsync(advertiserId, creativeId, ct)` | Gets a creative by ID. Returns `null` if not found |
+| `ListAsync(advertiserId, ct)` | Lists all creatives for the advertiser |
+
+```csharp
+// Third-party tag creative
+var tagCreative = await creativeService.CreateAsync(advertiserId, new Dv360Creative
+{
+    DisplayName = "Third Party Banner",
+    CreativeType = "CREATIVE_TYPE_STANDARD",
+    HostingSource = "HOSTING_SOURCE_THIRD_PARTY",
+    WidthPixels = 728,
+    HeightPixels = 90,
+    ThirdPartyTag = "<script>/* ad tag */</script>",
+    ExitEvents = [new Dv360ExitEvent { Url = "https://example.com/landing" }]
+});
+
+// Hosted display creative (auto-uploads assets)
+var hostedCreative = await creativeService.CreateAsync(advertiserId, new Dv360Creative
+{
+    DisplayName = "Hosted Banner 300x250",
+    CreativeType = "CREATIVE_TYPE_STANDARD",
+    HostingSource = "HOSTING_SOURCE_HOSTED",
+    WidthPixels = 300,
+    HeightPixels = 250,
+    ExitEvents = [new Dv360ExitEvent { Url = "https://example.com" }],
+    Assets = [new Dv360CreativeAsset
+    {
+        FilePath = "assets/banner_300x250.png",
+        MimeType = "image/png",
+        Role = "ASSET_ROLE_MAIN"
+    }]
+});
+```
+
+---
+
+### 6.4 IInsertionOrderService
+
+CRUD operations for DV360 insertion orders.
+
+| Method | Description |
+|--------|-------------|
+| `CreateAsync(advertiserId, insertionOrder, ct)` | Creates an IO. Returns with `InsertionOrderId` set |
+| `GetAsync(advertiserId, insertionOrderId, ct)` | Gets an IO by ID. Returns `null` if not found |
+| `ListAsync(advertiserId, ct)` | Lists all IOs for the advertiser |
+
+```csharp
+var io = await insertionOrderService.CreateAsync(advertiserId, new Dv360InsertionOrder
+{
+    CampaignId = campaignId,
+    DisplayName = "Q3 Insertion Order",
+    BudgetAmountMicros = 5_000_000_000,
+    StartDate = new DateOnly(2025, 7, 1),
+    EndDate = new DateOnly(2025, 9, 30),
+    PacingPeriod = "PACING_PERIOD_FLIGHT",
+    PacingType = "PACING_TYPE_EVEN",
+    KpiType = "KPI_TYPE_CPM",
+    KpiAmountMicros = 1_500_000,
+});
+```
+
+---
+
+### 6.5 ILineItemService
+
+CRUD operations for line items and creative assignment.
+
+| Method | Description |
+|--------|-------------|
+| `CreateAsync(advertiserId, lineItem, ct)` | Creates a line item. Returns with `LineItemId` set |
+| `GetAsync(advertiserId, lineItemId, ct)` | Gets a line item by ID. Returns `null` if not found |
+| `ListAsync(advertiserId, ct)` | Lists all line items for the advertiser |
+| `ListAsync(advertiserId, options, ct)` | Lists line items with filtering, sorting, and paging |
+| `PatchAsync(advertiserId, lineItemId, lineItem, ct)` | Updates an existing line item |
+| `DeleteAsync(advertiserId, lineItemId, ct)` | Permanently deletes a line item |
+| `AssignCreativeAsync(advertiserId, lineItemId, creativeId, ct)` | Links a creative to a line item |
+
+```csharp
+// Create
+var lineItem = await lineItemService.CreateAsync(advertiserId, new Dv360LineItem
+{
+    CampaignId = campaignId,
+    InsertionOrderId = ioId,
+    DisplayName = "Display Default Line Item",
+    LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
+    MaxBudgetAmountMicros = 1_000_000_000,
+    StartDate = new DateOnly(2025, 7, 1),
+    EndDate = new DateOnly(2025, 9, 30),
+    FixedBidAmountMicros = 2_000_000,
+});
+
+// Link a creative
+await lineItemService.AssignCreativeAsync(advertiserId, lineItem.LineItemId!.Value, creativeId);
+
+// List with filter
+var lineItems = await lineItemService.ListAsync(advertiserId, new LineItemListOptions
+{
+    Filter = $"insertionOrderId=\"{ioId}\"",
+    OrderBy = "displayName"
+});
+```
+
+---
+
+### 6.6 ITargetingService
+
+Assigns targeting options to line items.
+
+| Method | Description |
+|--------|-------------|
+| `AssignTargetingAsync(advertiserId, lineItemId, targeting, ct)` | Assigns all configured targeting types to a line item |
+
+```csharp
+await targetingService.AssignTargetingAsync(advertiserId, lineItemId, new Dv360LineItemTargeting
+{
+    GeoTargets =
+    [
+        new Dv360GeoTargeting { TargetingOptionId = "2840" },      // United States
+        new Dv360GeoTargeting { TargetingOptionId = "2826", Negative = true } // Exclude UK
+    ],
+    DeviceTypeTargets =
+    [
+        new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_COMPUTER" },
+        new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" }
+    ],
+    ContentLabelExclusions =
+    [
+        new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE" },
+        new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_PROFANITY" }
+    ],
+    ViewabilityTargets =
+    [
+        new Dv360ViewabilityTargeting { TargetingOptionId = "VIEWABILITY_40_PERCENT_OR_MORE" }
+    ]
+});
+```
+
+---
+
+### 6.7 IGeoRegionService
+
+Searches for geographic targeting option IDs by name. Results are cached in memory.
+
+| Method | Description |
+|--------|-------------|
+| `SearchAsync(advertiserId, searchQuery, ct)` | Searches geo-regions by partial name. Returns multiple matches |
+| `FindByNameAsync(advertiserId, displayName, ct)` | Finds an exact match by display name (case-insensitive). Returns `null` if not found |
+
+```csharp
+// Search (returns fuzzy matches)
+var results = await geoService.SearchAsync(advertiserId, "London");
+// Returns: London (UK), London (Canada), London (Kentucky), etc.
+
+// Exact match
+var kenya = await geoService.FindByNameAsync(advertiserId, "Kenya");
+// kenya.TargetingOptionId ? use in Dv360GeoTargeting
+
+// Use in targeting
+var targeting = new Dv360LineItemTargeting
+{
+    GeoTargets = [new Dv360GeoTargeting { TargetingOptionId = kenya!.TargetingOptionId }]
+};
+```
+
+---
+
+### 6.8 IAssetService
+
+Uploads media assets to DV360. Used internally by `ICreativeService` but available standalone.
+
+| Method | Description |
+|--------|-------------|
+| `UploadAsync(advertiserId, asset, ct)` | Uploads a file. Populates `MediaId` and `Content` on return |
+
+```csharp
+var asset = new Dv360CreativeAsset
+{
+    FilePath = "assets/video_ad.mp4",
+    MimeType = "video/mp4",
+    Role = "ASSET_ROLE_MAIN"
+};
+await assetService.UploadAsync(advertiserId, asset);
+Console.WriteLine($"MediaId: {asset.MediaId}");
+```
+
+---
+
+## 7. Model Reference
+
+### 7.1 Dv360Campaign
+
+Represents a DV360 campaign with flattened budget and goal settings.
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `CampaignId` | `long?` | No (output) | `null` | DV360-assigned ID. Populated after creation |
+| `DisplayName` | `string` | **Yes** | — | Human-readable campaign name |
+| `EntityStatus` | `string` | No | `"ENTITY_STATUS_PAUSED"` | Lifecycle status. See [Entity Status values](#entity-status) |
+| `GoalType` | `string` | **Yes** | — | Campaign goal type. See [Campaign Goal Type values](#campaign-goal-type) |
+| `PerformanceGoalType` | `string` | **Yes** | — | Performance goal type. See [Performance Goal Type values](#performance-goal-type) |
+| `PerformanceGoalAmountMicros` | `long?` | Conditional | `null` | Goal amount in micros. For currency-based goals (CPM, CPC, CPA) |
+| `PerformanceGoalPercentageMicros` | `long?` | Conditional | `null` | Goal percentage in micros. For rate-based goals (CTR, viewability) |
+| `PerformanceGoalString` | `string?` | Conditional | `null` | KPI string. For `PERFORMANCE_GOAL_TYPE_OTHER` |
+| `BudgetDisplayName` | `string` | No | `"Total Campaign Budget"` | Budget display name (max 240 bytes UTF-8) |
+| `BudgetUnit` | `string` | No | `"BUDGET_UNIT_CURRENCY"` | Budget unit. See [Budget Unit values](#budget-unit) |
+| `BudgetAmountMicros` | `long` | **Yes** | `0` | Total campaign budget in micros |
+| `PlannedSpendAmountMicros` | `long?` | No | `null` | Planned spend (UI tracking only, does not limit serving) |
+| `StartDate` | `DateOnly?` | No | `null` | Flight start date. `null` = open-ended |
+| `EndDate` | `DateOnly?` | No | `null` | Flight end date. `null` = open-ended |
+
+> **Note:** Only one of `PerformanceGoalAmountMicros`, `PerformanceGoalPercentageMicros`, or `PerformanceGoalString` should be set, depending on the `PerformanceGoalType`.
+
+---
+
+### 7.2 Dv360InsertionOrder
+
+Represents a DV360 insertion order with a single budget segment.
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `InsertionOrderId` | `long?` | No (output) | `null` | DV360-assigned ID. Populated after creation |
+| `CampaignId` | `long` | Auto-wired | `0` | Parent campaign ID. **Set automatically by workflow** |
+| `DisplayName` | `string` | **Yes** | — | Human-readable IO name |
+| `EntityStatus` | `string` | No | `"ENTITY_STATUS_DRAFT"` | Lifecycle status. See [Entity Status values](#entity-status) |
+| `BudgetUnit` | `string` | No | `"BUDGET_UNIT_CURRENCY"` | Budget unit. See [Budget Unit values](#budget-unit) |
+| `BudgetAmountMicros` | `long` | **Yes** | `0` | Total IO budget in micros |
+| `StartDate` | `DateOnly?` | No | `null` | Budget segment start date |
+| `EndDate` | `DateOnly?` | No | `null` | Budget segment end date |
+| `PacingPeriod` | `string` | No | `"PACING_PERIOD_FLIGHT"` | Pacing time period. See [Pacing Period values](#pacing-period) |
+| `PacingType` | `string` | No | `"PACING_TYPE_EVEN"` | Pacing algorithm. See [Pacing Type values](#pacing-type) |
+| `DailyMaxMicros` | `long` | No | `0` | Daily spend cap in micros (used with `PACING_TYPE_AHEAD`) |
+| `KpiType` | `string` | No | `"KPI_TYPE_CPM"` | KPI type. See [KPI Type values](#kpi-type) |
+| `KpiAmountMicros` | `long?` | No | `null` | KPI goal amount in micros |
+| `OptimizationObjective` | `string` | No | `"NO_OBJECTIVE"` | Optimization objective. See [Optimization Objective values](#optimization-objective) |
+| `TimeUnit` | `string` | No | `"TIME_UNIT_LIFETIME"` | Frequency cap time unit |
+
+---
+
+### 7.3 Dv360LineItem
+
+Represents a DV360 line item with flattened budget, flight, pacing, bid strategy, and targeting.
+
+#### Core Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `LineItemId` | `long?` | No (output) | `null` | DV360-assigned ID. Populated after creation |
+| `CampaignId` | `long` | Auto-wired | `0` | Parent campaign ID. **Set automatically by workflow** |
+| `InsertionOrderId` | `long` | Auto-wired | `0` | Parent IO ID. **Set automatically by workflow** |
+| `DisplayName` | `string` | **Yes** | — | Human-readable line item name |
+| `LineItemType` | `string` | **Yes** | — | Line item type. See [Line Item Type values](#line-item-type) |
+| `EntityStatus` | `string` | No | `"ENTITY_STATUS_DRAFT"` | Lifecycle status. See [Entity Status values](#entity-status) |
+| `ContainsEuPoliticalAds` | `string` | No | `"DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"` | EU political ads declaration |
+
+#### Flight Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `FlightDateType` | `string` | No | `"LINE_ITEM_FLIGHT_DATE_TYPE_CUSTOM"` | Flight date source. See [Flight Date Type values](#flight-date-type) |
+| `StartDate` | `DateOnly?` | Conditional | `null` | Required when `FlightDateType` = `CUSTOM` |
+| `EndDate` | `DateOnly?` | Conditional | `null` | Required when `FlightDateType` = `CUSTOM` |
+
+#### Budget Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `BudgetAllocationType` | `string` | No | `"LINE_ITEM_BUDGET_ALLOCATION_TYPE_FIXED"` | Budget allocation type |
+| `BudgetUnit` | `string` | No | `"BUDGET_UNIT_CURRENCY"` | Budget unit. See [Budget Unit values](#budget-unit) |
+| `MaxBudgetAmountMicros` | `long` | **Yes** | `0` | Maximum lifetime budget in micros |
+
+#### Pacing Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PacingPeriod` | `string` | No | `"PACING_PERIOD_DAILY"` | Pacing period. See [Pacing Period values](#pacing-period) |
+| `PacingType` | `string` | No | `"PACING_TYPE_AHEAD"` | Pacing algorithm. See [Pacing Type values](#pacing-type) |
+| `DailyMaxMicros` | `long` | No | `0` | Daily spend cap in micros |
+
+#### Bid Strategy Properties (Mutually Exclusive)
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `FixedBidAmountMicros` | `long?` | **Option A** | `null` | Fixed CPM bid in micros |
+| `MaximizeSpendPerformanceGoalType` | `string?` | **Option B** | `null` | Auto-bid goal type. See [Bid Strategy Goal Type values](#bid-strategy-performance-goal-type) |
+| `MaxAverageCpmBidAmountMicros` | `long?` | No | `null` | Max average CPM cap for auto-bidding |
+
+> ?? Set **either** `FixedBidAmountMicros` **or** `MaximizeSpendPerformanceGoalType`, never both.
+
+#### Frequency Cap Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `FrequencyCapUnlimited` | `bool` | No | `true` | `true` = no frequency cap |
+| `FrequencyCapMaxImpressions` | `int?` | Conditional | `null` | Max impressions per user (when cap enabled) |
+| `FrequencyCapTimeUnit` | `string?` | Conditional | `null` | Time window unit. See [Time Unit values](#time-unit) |
+| `FrequencyCapTimeUnitCount` | `int?` | Conditional | `null` | Number of time unit periods |
+
+#### Partner Revenue Model Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PartnerRevenueModelMarkupType` | `string` | No | `"PARTNER_REVENUE_MODEL_MARKUP_TYPE_TOTAL_MEDIA_COST_MARKUP"` | Revenue model type |
+| `PartnerRevenueModelMarkupAmount` | `long` | No | `0` | Markup amount |
+
+#### Conversion Counting Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ConversionCounting` | `Dv360ConversionCountingConfig?` | No | `null` | Conversion tracking configuration |
+
+#### Integration Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `IntegrationCode` | `string?` | No | `null` | External integration code |
+| `IntegrationDetails` | `string?` | No | `null` | External integration details |
+
+#### Other Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ExcludeNewExchanges` | `bool` | No | `false` | Exclude newly added exchanges |
+| `MobileAppId` | `string?` | Conditional | `null` | Required for mobile app install line items |
+| `MobileAppPlatform` | `string?` | Conditional | `null` | `"IOS"` or `"ANDROID"` |
+| `Targeting` | `Dv360LineItemTargeting?` | No | `null` | Targeting configuration (applied by workflow) |
+
+#### Read-Only Output Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `UpdateTime` | `DateTimeOffset?` | Last update timestamp |
+| `ReservationType` | `string?` | Reservation type |
+| `WarningMessages` | `IReadOnlyList<string>?` | DV360-generated warnings |
+
+---
+
+### 7.4 Dv360Creative
+
+Represents a DV360 creative asset (display banner, video ad, third-party tag).
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `CreativeId` | `long?` | No (output) | `null` | DV360-assigned ID. Populated after creation |
+| `DisplayName` | `string` | **Yes** | — | Human-readable creative name |
+| `EntityStatus` | `string` | No | `"ENTITY_STATUS_ACTIVE"` | Lifecycle status |
+| `CreativeType` | `string` | **Yes** | — | Creative type. See [Creative Type values](#creative-type) |
+| `HostingSource` | `string?` | No | `null` | Hosting source. See [Hosting Source values](#hosting-source) |
+| `WidthPixels` | `int?` | No | `null` | Creative width in pixels |
+| `HeightPixels` | `int?` | No | `null` | Creative height in pixels |
+| `ThirdPartyTag` | `string?` | Conditional | `null` | Ad tag markup for third-party creatives |
+| `Assets` | `List<Dv360CreativeAsset>?` | Conditional | `null` | Media assets for hosted creatives |
+| `ExitEvents` | `List<Dv360ExitEvent>?` | **Yes** | `null` | At least one exit event (click-through URL) is required |
+
+---
+
+### 7.5 Dv360CreativeAsset
+
+Represents a media file uploaded to DV360.
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `FilePath` | `string?` | **Yes** (for upload) | `null` | Local file path to the asset |
+| `MimeType` | `string?` | **Yes** (for upload) | `null` | MIME type (e.g., `"image/png"`, `"video/mp4"`) |
+| `Role` | `string` | No | `"ASSET_ROLE_MAIN"` | Asset role. See [Asset Role values](#asset-role) |
+| `Filename` | `string?` | No | Derived from `FilePath` | Override filename sent to DV360 |
+| `MediaId` | `long?` | No (output) | `null` | DV360-assigned media ID after upload |
+| `Content` | `string?` | No (output) | `null` | Asset content URL after upload |
+
+---
+
+### 7.6 Dv360ExitEvent
+
+Represents a click-through URL on a creative.
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `Type` | `string` | No | `"EXIT_EVENT_TYPE_DEFAULT"` | Exit event type |
+| `Url` | `string` | **Yes** | — | Landing page URL |
+
+**Exit Event Type Values:**
+
+| Value | Description |
+|-------|-------------|
+| `EXIT_EVENT_TYPE_DEFAULT` | Default click-through |
+| `EXIT_EVENT_TYPE_BACKUP` | Backup click-through URL |
+
+---
+
+### 7.7 Dv360LineItemTargeting
+
+Container for all targeting types assignable to a line item. All properties are optional — `null` or empty means that targeting type is skipped.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `GeoTargets` | `List<Dv360GeoTargeting>?` | Geographic regions to target/exclude |
+| `DeviceTypeTargets` | `List<Dv360DeviceTypeTargeting>?` | Device types to target |
+| `BrowserTargets` | `List<Dv360BrowserTargeting>?` | Browsers to target/exclude |
+| `ChannelTargets` | `List<Dv360ChannelTargeting>?` | Inventory channels to target/exclude |
+| `ContentLabelExclusions` | `List<Dv360ContentLabelExclusionTargeting>?` | Content labels to exclude (brand safety) |
+| `ContentInstreamPositionTargets` | `List<Dv360ContentInstreamPositionTargeting>?` | Video ad positions (pre-roll, mid-roll, etc.) |
+| `ViewabilityTargets` | `List<Dv360ViewabilityTargeting>?` | Viewability thresholds |
+
+#### Dv360GeoTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `TargetingOptionId` | `string` | **Yes** | — | Geo-region ID (e.g., `"2840"` for US). Use `IGeoRegionService` to look up |
+| `Negative` | `bool` | No | `false` | `true` = exclude this region |
+
+#### Dv360DeviceTypeTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DeviceType` | `string` | **Yes** | — | Device type enum. See [Device Type values](#device-type) |
+
+#### Dv360BrowserTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `TargetingOptionId` | `string` | **Yes** | — | Browser targeting option ID |
+| `Negative` | `bool` | No | `false` | `true` = exclude this browser |
+
+#### Dv360ChannelTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ChannelId` | `long` | **Yes** | — | DV360 channel resource ID |
+| `Negative` | `bool` | No | `false` | `true` = block this channel |
+
+#### Dv360ContentLabelExclusionTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ContentLabelType` | `string` | **Yes** | — | Content label to exclude. See [Content Label Type values](#content-label-type) |
+
+#### Dv360ContentInstreamPositionTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ContentInstreamPosition` | `string` | **Yes** | — | Ad position. See [Content Instream Position values](#content-instream-position) |
+
+#### Dv360ViewabilityTargeting
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `TargetingOptionId` | `string` | **Yes** | — | Viewability threshold. See [Viewability values](#viewability) |
+
+---
+
+### 7.8 Dv360GeoRegion
+
+Returned by `IGeoRegionService` when searching for geographic targeting options.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `TargetingOptionId` | `string` | The ID to use in `Dv360GeoTargeting.TargetingOptionId` |
+| `DisplayName` | `string` | Human-readable name (e.g., `"United States"`, `"Nairobi"`) |
+| `GeoRegionType` | `string` | Granularity level. See [Geo Region Type values](#geo-region-type) |
+
+---
+
+### 7.9 CampaignWorkflowRequest
+
+Input model for the campaign creation workflow.
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `AdvertiserId` | `long` | **Yes** | DV360 advertiser ID |
+| `Campaign` | `Dv360Campaign` | **Yes** | Campaign definition |
+| `Creatives` | `List<Dv360Creative>` | **Yes** | One or more creatives to upload |
+| `InsertionOrder` | `Dv360InsertionOrder` | **Yes** | IO definition (CampaignId wired automatically) |
+| `LineItems` | `List<Dv360LineItem>` | **Yes** | One or more line items (CampaignId + InsertionOrderId wired automatically) |
+
+---
+
+### 7.10 CampaignWorkflowResult
+
+Output model with all created resources and their DV360-assigned IDs.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Campaign` | `Dv360Campaign` | Created campaign with `CampaignId` populated |
+| `Creatives` | `IReadOnlyList<Dv360Creative>` | Created creatives with `CreativeId` populated |
+| `InsertionOrder` | `Dv360InsertionOrder` | Created IO with `InsertionOrderId` populated |
+| `LineItems` | `IReadOnlyList<Dv360LineItem>` | Created line items with `LineItemId` populated |
+
+---
+
+### 7.11 CampaignListOptions
+
+Options for listing campaigns with server-side filtering.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `PageSize` | `int?` | API default (100) | Page size (1–200) |
+| `OrderBy` | `string?` | `"displayName"` asc | Sort field. Values: `"displayName"`, `"entityStatus"`, `"updateTime"`. Append `" desc"` for descending |
+| `Filter` | `string?` | Excludes archived | DV360 list filter expression (max 500 chars) |
+
+**Filter examples:**
+```
+entityStatus="ENTITY_STATUS_ACTIVE"
+(entityStatus="ENTITY_STATUS_ACTIVE" OR entityStatus="ENTITY_STATUS_PAUSED")
+updateTime>="2024-01-01T00:00:00Z"
+displayName="Summer Campaign"
+```
+
+---
+
+### 7.12 LineItemListOptions
+
+Options for listing line items with server-side filtering.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `PageSize` | `int?` | API default (100) | Page size (1–200) |
+| `OrderBy` | `string?` | `"displayName"` asc | Sort field. Values: `"displayName"`, `"entityStatus"`, `"updateTime"`, `"flight.dateRange.endDate"`. Append `" desc"` for descending |
+| `Filter` | `string?` | Excludes archived | DV360 list filter expression (max 500 chars) |
+
+**Filter examples:**
+```
+insertionOrderId="12345"
+entityStatus="ENTITY_STATUS_ACTIVE"
+campaignId="67890"
+lineItemType="LINE_ITEM_TYPE_DISPLAY_DEFAULT"
+```
+
+---
+
+## 8. Enum Value Reference
+
+### Entity Status
+
+Applies to campaigns, insertion orders, line items, and creatives.
+
+| Value | Description |
+|-------|-------------|
+| `ENTITY_STATUS_ACTIVE` | Active and eligible for serving |
+| `ENTITY_STATUS_PAUSED` | Paused — not serving but can be resumed |
+| `ENTITY_STATUS_DRAFT` | Draft — not yet activated |
+| `ENTITY_STATUS_ARCHIVED` | Archived — hidden from default list views |
+
+> ?? Campaigns cannot be created in `ENTITY_STATUS_ACTIVE` directly. Create as `ENTITY_STATUS_PAUSED` first, then update.
+
+---
+
+### Campaign Goal Type
+
+| Value | Description |
+|-------|-------------|
+| `CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS` | Build brand awareness |
+| `CAMPAIGN_GOAL_TYPE_DRIVE_ONLINE_ACTION` | Drive online actions (signups, purchases) |
+| `CAMPAIGN_GOAL_TYPE_DRIVE_OFFLINE_ACTION` | Drive offline store visits/actions |
+
+---
+
+### Performance Goal Type
+
+Qualifies the campaign goal with a specific metric.
+
+| Value | Applicable Goal Value Field | Description |
+|-------|---------------------------|-------------|
+| `PERFORMANCE_GOAL_TYPE_CPM` | `PerformanceGoalAmountMicros` | Cost per mille (1,000 impressions) |
+| `PERFORMANCE_GOAL_TYPE_CPC` | `PerformanceGoalAmountMicros` | Cost per click |
+| `PERFORMANCE_GOAL_TYPE_CPA` | `PerformanceGoalAmountMicros` | Cost per acquisition |
+| `PERFORMANCE_GOAL_TYPE_CPIAVC` | `PerformanceGoalAmountMicros` | Cost per completed audio/video |
+| `PERFORMANCE_GOAL_TYPE_VCPM` | `PerformanceGoalAmountMicros` | Viewable CPM |
+| `PERFORMANCE_GOAL_TYPE_CTR` | `PerformanceGoalPercentageMicros` | Click-through rate |
+| `PERFORMANCE_GOAL_TYPE_VIEWABILITY` | `PerformanceGoalPercentageMicros` | Viewability rate |
+| `PERFORMANCE_GOAL_TYPE_CLICK_CVR` | `PerformanceGoalPercentageMicros` | Click conversion rate |
+| `PERFORMANCE_GOAL_TYPE_IMPRESSION_CVR` | `PerformanceGoalPercentageMicros` | Impression conversion rate |
+| `PERFORMANCE_GOAL_TYPE_VTR` | `PerformanceGoalPercentageMicros` | View-through rate |
+| `PERFORMANCE_GOAL_TYPE_AUDIO_COMPLETION_RATE` | `PerformanceGoalPercentageMicros` | Audio completion rate |
+| `PERFORMANCE_GOAL_TYPE_VIDEO_COMPLETION_RATE` | `PerformanceGoalPercentageMicros` | Video completion rate |
+| `PERFORMANCE_GOAL_TYPE_OTHER` | `PerformanceGoalString` | Custom KPI string |
+
+---
+
+### Budget Unit
+
+| Value | Description |
+|-------|-------------|
+| `BUDGET_UNIT_CURRENCY` | Budget in currency (micros) |
+| `BUDGET_UNIT_IMPRESSIONS` | Budget in impressions |
+
+---
+
+### Line Item Type
+
+| Value | Description |
+|-------|-------------|
+| `LINE_ITEM_TYPE_DISPLAY_DEFAULT` | Standard display ads |
+| `LINE_ITEM_TYPE_DISPLAY_MOBILE_APP_INSTALL` | Display mobile app install |
+| `LINE_ITEM_TYPE_VIDEO_DEFAULT` | Standard video ads |
+| `LINE_ITEM_TYPE_VIDEO_MOBILE_APP_INSTALL` | Video mobile app install |
+| `LINE_ITEM_TYPE_DISPLAY_MOBILE_APP_INVENTORY` | Display mobile app inventory |
+| `LINE_ITEM_TYPE_VIDEO_MOBILE_APP_INVENTORY` | Video mobile app inventory |
+| `LINE_ITEM_TYPE_AUDIO_DEFAULT` | Standard audio ads |
+| `LINE_ITEM_TYPE_VIDEO_OVER_THE_TOP` | OTT video ads |
+| `LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_ACTION` | YouTube & Partners action |
+| `LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_NON_SKIPPABLE` | YouTube non-skippable |
+| `LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_REACH` | YouTube reach |
+| `LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_SIMPLE` | YouTube simple |
+| `LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_VIDEO_SEQUENCE` | YouTube video sequence |
+
+---
+
+### Flight Date Type
+
+| Value | Description |
+|-------|-------------|
+| `LINE_ITEM_FLIGHT_DATE_TYPE_CUSTOM` | Custom dates — `StartDate` and `EndDate` required |
+| `LINE_ITEM_FLIGHT_DATE_TYPE_INHERITED` | Inherit dates from the parent insertion order |
+
+---
+
+### Budget Allocation Type
+
+| Value | Description |
+|-------|-------------|
+| `LINE_ITEM_BUDGET_ALLOCATION_TYPE_FIXED` | Fixed budget allocation |
+| `LINE_ITEM_BUDGET_ALLOCATION_TYPE_UNLIMITED` | Unlimited budget (inherit from IO) |
+| `LINE_ITEM_BUDGET_ALLOCATION_TYPE_AUTOMATIC` | Automatic budget allocation |
+
+---
+
+### Pacing Period
+
+| Value | Description |
+|-------|-------------|
+| `PACING_PERIOD_DAILY` | Pacing calculated daily |
+| `PACING_PERIOD_FLIGHT` | Pacing calculated over the entire flight |
+
+---
+
+### Pacing Type
+
+| Value | Description |
+|-------|-------------|
+| `PACING_TYPE_EVEN` | Even pacing throughout the period |
+| `PACING_TYPE_AHEAD` | Spend-ahead pacing (may use `DailyMaxMicros`) |
+| `PACING_TYPE_ASAP` | Spend as soon as possible |
+
+---
+
+### KPI Type
+
+Used on insertion orders.
+
+| Value | Metric Type | Description |
+|-------|-------------|-------------|
+| `KPI_TYPE_CPM` | Currency | Cost per mille |
+| `KPI_TYPE_CPC` | Currency | Cost per click |
+| `KPI_TYPE_CPA` | Currency | Cost per acquisition |
+| `KPI_TYPE_VIEWABILITY` | Percentage | Viewability rate |
+| `KPI_TYPE_CTR` | Percentage | Click-through rate |
+| `KPI_TYPE_CPIAVC` | Currency | Cost per completed audio/video |
+| `KPI_TYPE_CPE` | Currency | Cost per engagement |
+| `KPI_TYPE_CPV` | Currency | Cost per view |
+| `KPI_TYPE_CLICK_CVR` | Percentage | Click conversion rate |
+| `KPI_TYPE_IMPRESSION_CVR` | Percentage | Impression conversion rate |
+| `KPI_TYPE_VTR` | Percentage | View-through rate |
+| `KPI_TYPE_OTHER` | String | Custom KPI |
+
+---
+
+### Optimization Objective
+
+| Value | Description |
+|-------|-------------|
+| `NO_OBJECTIVE` | No optimization objective |
+| `OPT_OBJECTIVE_BALANCED_SCHEDULE` | Balanced delivery schedule |
+| `OPT_OBJECTIVE_FAVOR_NEW_CUSTOMER` | Favor new customers |
+| `OPT_OBJECTIVE_CUSTOM_ALGO` | Custom algorithm |
+
+---
+
+### Creative Type
+
+| Value | Description |
+|-------|-------------|
+| `CREATIVE_TYPE_STANDARD` | Standard display creative (image) |
+| `CREATIVE_TYPE_VIDEO` | Video creative |
+| `CREATIVE_TYPE_EXPANDABLE` | Expandable creative |
+| `CREATIVE_TYPE_NATIVE` | Native creative |
+| `CREATIVE_TYPE_AUDIO` | Audio creative |
+| `CREATIVE_TYPE_NATIVE_VIDEO` | Native video creative |
+
+---
+
+### Hosting Source
+
+| Value | Description |
+|-------|-------------|
+| `HOSTING_SOURCE_HOSTED` | Asset hosted on DV360 (upload required) |
+| `HOSTING_SOURCE_THIRD_PARTY` | Third-party hosted (tag-based) |
+
+---
+
+### Asset Role
+
+| Value | Description |
+|-------|-------------|
+| `ASSET_ROLE_MAIN` | Primary asset of the creative |
+| `ASSET_ROLE_BACKUP` | Backup/fallback asset |
+
+---
+
+### Device Type
+
+| Value | Description |
+|-------|-------------|
+| `DEVICE_TYPE_COMPUTER` | Desktop/laptop computers |
+| `DEVICE_TYPE_CONNECTED_TV` | Connected TV devices |
+| `DEVICE_TYPE_SMART_PHONE` | Mobile phones |
+| `DEVICE_TYPE_TABLET` | Tablets |
+
+---
+
+### Content Label Type
+
+Brand safety content exclusions.
+
+| Value | Description |
+|-------|-------------|
+| `CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE` | Sexually suggestive content |
+| `CONTENT_LABEL_TYPE_BELOW_THE_FOLD` | Below-the-fold ad placements |
+| `CONTENT_LABEL_TYPE_PROFANITY` | Content containing profanity |
+| `CONTENT_LABEL_TYPE_TRAGEDY` | Content about tragedies |
+| `CONTENT_LABEL_TYPE_TRANSPORTATION_ACCIDENTS` | Transportation accident content |
+| `CONTENT_LABEL_TYPE_SENSITIVE_SOCIAL_ISSUES` | Sensitive social issues content |
+| `CONTENT_LABEL_TYPE_EMBEDDED_VIDEO` | Embedded video content |
+| `CONTENT_LABEL_TYPE_LIVE_STREAMING_VIDEO` | Live streaming video |
+
+---
+
+### Content Instream Position
+
+Video ad placement positions.
+
+| Value | Description |
+|-------|-------------|
+| `CONTENT_INSTREAM_POSITION_PRE_ROLL` | Before the main video content |
+| `CONTENT_INSTREAM_POSITION_MID_ROLL` | During the main video content |
+| `CONTENT_INSTREAM_POSITION_POST_ROLL` | After the main video content |
+| `CONTENT_INSTREAM_POSITION_UNKNOWN` | Unknown position |
+
+---
+
+### Viewability
+
+Minimum predicted viewability thresholds.
+
+| Value | Description |
+|-------|-------------|
+| `VIEWABILITY_10_PERCENT_OR_MORE` | ? 10% predicted viewability |
+| `VIEWABILITY_20_PERCENT_OR_MORE` | ? 20% predicted viewability |
+| `VIEWABILITY_30_PERCENT_OR_MORE` | ? 30% predicted viewability |
+| `VIEWABILITY_40_PERCENT_OR_MORE` | ? 40% predicted viewability |
+| `VIEWABILITY_50_PERCENT_OR_MORE` | ? 50% predicted viewability |
+| `VIEWABILITY_60_PERCENT_OR_MORE` | ? 60% predicted viewability |
+| `VIEWABILITY_70_PERCENT_OR_MORE` | ? 70% predicted viewability |
+| `VIEWABILITY_80_PERCENT_OR_MORE` | ? 80% predicted viewability |
+| `VIEWABILITY_90_PERCENT_OR_MORE` | ? 90% predicted viewability |
+
+---
+
+### Geo Region Type
+
+Returned by `IGeoRegionService`.
+
+| Value | Description |
+|-------|-------------|
+| `GEO_REGION_TYPE_COUNTRY` | Country (e.g., "United States", "Kenya") |
+| `GEO_REGION_TYPE_REGION` | State/province/region (e.g., "California") |
+| `GEO_REGION_TYPE_CITY` | City (e.g., "Nairobi", "London") |
+| `GEO_REGION_TYPE_DMA_REGION` | Designated Market Area (US-specific) |
+| `GEO_REGION_TYPE_POSTAL_CODE` | Postal/ZIP code |
+| `GEO_REGION_TYPE_COUNTY` | County |
+
+---
+
+### EU Political Ads
+
+| Value | Description |
+|-------|-------------|
+| `DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING` | No EU political ads |
+| `CONTAINS_EU_POLITICAL_ADVERTISING` | Contains EU political ads |
+
+---
+
+### Bid Strategy Performance Goal Type
+
+Used with `MaximizeSpendPerformanceGoalType` on line items.
+
+| Value | Description |
+|-------|-------------|
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_CPC` | Optimize for cost per click |
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_CPA` | Optimize for cost per acquisition |
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_VIEWABLE_CPM` | Optimize for viewable CPM |
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_CIVA` | Optimize for completed in-view & audible |
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_IVO_TEN` | Optimize for impression with ?10s view |
+| `BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_AV_VIEWED` | Optimize for audio & video viewed |
+
+---
+
+### Partner Revenue Model Markup Type
+
+| Value | Description |
+|-------|-------------|
+| `PARTNER_REVENUE_MODEL_MARKUP_TYPE_TOTAL_MEDIA_COST_MARKUP` | Markup on total media cost |
+| `PARTNER_REVENUE_MODEL_MARKUP_TYPE_CPM` | Fixed CPM markup |
+
+---
+
+### Time Unit
+
+Used for frequency caps and IO time configurations.
+
+| Value | Description |
+|-------|-------------|
+| `TIME_UNIT_DAYS` | Days |
+| `TIME_UNIT_WEEKS` | Weeks |
+| `TIME_UNIT_MONTHS` | Months |
+| `TIME_UNIT_LIFETIME` | Entire campaign lifetime |
+| `TIME_UNIT_MINUTES` | Minutes |
+| `TIME_UNIT_HOURS` | Hours |
+
+---
+
+### Mobile App Platform
+
+| Value | Description |
+|-------|-------------|
+| `IOS` | Apple iOS |
+| `ANDROID` | Google Android |
+
+---
+
+## 9. Campaign Creation Workflow
+
+The `ICampaignWorkflowService.ExecuteAsync()` method orchestrates the full end-to-end campaign creation process. Here is the complete flow:
+
+```
+????????????????????????????????????????????????????????????
+?                  CampaignWorkflowRequest                 ?
+?  ???????????? ????????????? ??????????? ?????????????   ?
+?  ? Campaign ? ? Creatives ? ?   IO    ? ?LineItems  ?   ?
+?  ???????????? ????????????? ??????????? ?????????????   ?
+????????????????????????????????????????????????????????????
+                   ?
+                   ?
+        ???????????????????????
+        ?  STEP 1: Creatives  ?  Upload creatives (independent of campaign)
+        ?  ICreativeService   ?  ? Auto-uploads hosted assets via IAssetService
+        ?  .CreateAsync()     ?  ? Returns CreativeId for each
+        ???????????????????????
+                  ?
+                  ?
+        ???????????????????????
+        ?  STEP 2: Campaign   ?  Create the campaign
+        ?  ICampaignService   ?  ? Returns CampaignId
+        ?  .CreateAsync()     ?
+        ???????????????????????
+                  ?
+                  ?  CampaignId is wired into:
+                  ?    • InsertionOrder.CampaignId
+                  ?    • LineItem[].CampaignId
+                  ?
+                  ?
+        ???????????????????????????????
+        ?  STEP 3a: Insertion Order   ?  Create IO under the campaign
+        ?  IInsertionOrderService     ?  ? Returns InsertionOrderId
+        ?  .CreateAsync()             ?
+        ???????????????????????????????
+                  ?
+                  ?  InsertionOrderId is wired into:
+                  ?    • LineItem[].InsertionOrderId
+                  ?
+                  ?
+        ???????????????????????????????
+        ?  STEP 3b: Line Items        ?  Create each line item under
+        ?  ILineItemService           ?  the campaign + IO
+        ?  .CreateAsync()             ?  ? Returns LineItemId for each
+        ???????????????????????????????
+                  ?
+                  ?
+        ???????????????????????????????
+        ?  STEP 3c: Targeting         ?  For each line item with
+        ?  ITargetingService          ?  non-null Targeting property:
+        ?  .AssignTargetingAsync()    ?  ? Creates AssignedTargetingOptions
+        ???????????????????????????????
+                  ?
+                  ?
+        ???????????????????????????????????????????
+        ?  STEP 4: Creative ? Line Item Linking   ?  Cross-join:
+        ?  ILineItemService                       ?  Every creative is linked
+        ?  .AssignCreativeAsync()                  ?  to every line item
+        ???????????????????????????????????????????
+                  ?
+                  ?
+        ???????????????????????????????
+        ?  CampaignWorkflowResult     ?
+        ?  • Campaign  (with ID)      ?
+        ?  • Creatives (with IDs)     ?
+        ?  • InsertionOrder (with ID) ?
+        ?  • LineItems (with IDs)     ?
+        ???????????????????????????????
+```
+
+### Automatic ID Wiring
+
+You do **not** need to set the following properties — the workflow sets them automatically:
+
+| Property | Set After |
+|----------|-----------|
+| `InsertionOrder.CampaignId` | Step 2 (campaign creation) |
+| `LineItem[].CampaignId` | Step 2 (campaign creation) |
+| `LineItem[].InsertionOrderId` | Step 3a (IO creation) |
+
+### Creative ? Line Item Linking (Step 4)
+
+The workflow performs a **full cross-join**: every creative is assigned to every line item.
+
+| Creatives | Line Items | Total Assignments |
+|-----------|-----------|-------------------|
+| 1 | 1 | 1 |
+| 2 | 3 | 6 |
+| 5 | 4 | 20 |
+
+---
+
+## 10. Complete Usage Examples
+
+### Example 1: Full Workflow with Targeting
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Suss.Dv360.Client.Configuration;
+using Suss.Dv360.Client.Models;
+using Suss.Dv360.Client.Services;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddDv360Client(options =>
+{
+    options.AuthMode = AuthMode.ServiceAccount;
+    options.ServiceAccountKeyPath = "path/to/key.json";
+});
+
+var app = builder.Build();
+using var scope = app.Services.CreateScope();
+
+var workflow = scope.ServiceProvider.GetRequiredService<ICampaignWorkflowService>();
+var geoService = scope.ServiceProvider.GetRequiredService<IGeoRegionService>();
+
+long advertiserId = 8101501893;
+
+// Resolve geo targeting dynamically
+var kenya = await geoService.FindByNameAsync(advertiserId, "Kenya");
+var nairobi = await geoService.FindByNameAsync(advertiserId, "Nairobi");
+
+var request = new CampaignWorkflowRequest
+{
+    AdvertiserId = advertiserId,
+
+    Campaign = new Dv360Campaign
+    {
+        DisplayName = "Kenya Brand Awareness Q3 2025",
+        GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
+        PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
+        PerformanceGoalAmountMicros = 1_500_000,        // $1.50 CPM
+        BudgetAmountMicros = 10_000_000_000,             // $10,000 budget
+        BudgetUnit = "BUDGET_UNIT_CURRENCY",
+        BudgetDisplayName = "Q3 Brand Budget",
+        PlannedSpendAmountMicros = 8_000_000_000,        // $8,000 planned
+        StartDate = new DateOnly(2025, 7, 1),
+        EndDate = new DateOnly(2025, 9, 30),
+        EntityStatus = "ENTITY_STATUS_PAUSED"
+    },
+
+    Creatives =
+    [
+        new Dv360Creative
+        {
+            DisplayName = "Banner 300x250 - Product A",
+            CreativeType = "CREATIVE_TYPE_STANDARD",
+            HostingSource = "HOSTING_SOURCE_HOSTED",
+            WidthPixels = 300,
+            HeightPixels = 250,
+            ExitEvents = [new Dv360ExitEvent { Url = "https://example.com/product-a" }],
+            Assets = [new Dv360CreativeAsset
+            {
+                FilePath = "assets/product_a_300x250.png",
+                MimeType = "image/png",
+                Role = "ASSET_ROLE_MAIN"
+            }]
+        },
+        new Dv360Creative
+        {
+            DisplayName = "Banner 728x90 - Product A",
+            CreativeType = "CREATIVE_TYPE_STANDARD",
+            HostingSource = "HOSTING_SOURCE_HOSTED",
+            WidthPixels = 728,
+            HeightPixels = 90,
+            ExitEvents = [new Dv360ExitEvent { Url = "https://example.com/product-a" }],
+            Assets = [new Dv360CreativeAsset
+            {
+                FilePath = "assets/product_a_728x90.png",
+                MimeType = "image/png",
+                Role = "ASSET_ROLE_MAIN"
+            }]
+        }
+    ],
+
+    InsertionOrder = new Dv360InsertionOrder
+    {
+        DisplayName = "Kenya IO - Q3",
+        EntityStatus = "ENTITY_STATUS_DRAFT",
+        BudgetUnit = "BUDGET_UNIT_CURRENCY",
+        BudgetAmountMicros = 10_000_000_000,             // $10,000
+        StartDate = new DateOnly(2025, 7, 1),
+        EndDate = new DateOnly(2025, 9, 30),
+        PacingPeriod = "PACING_PERIOD_FLIGHT",
+        PacingType = "PACING_TYPE_EVEN",
+        KpiType = "KPI_TYPE_CPM",
+        KpiAmountMicros = 1_500_000,                     // $1.50 CPM target
+        OptimizationObjective = "NO_OBJECTIVE"
+    },
+
+    LineItems =
+    [
+        new Dv360LineItem
+        {
+            DisplayName = "Display - Kenya Desktop & Mobile",
+            LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
+            EntityStatus = "ENTITY_STATUS_DRAFT",
+            FlightDateType = "LINE_ITEM_FLIGHT_DATE_TYPE_INHERITED",
+            BudgetAllocationType = "LINE_ITEM_BUDGET_ALLOCATION_TYPE_FIXED",
+            BudgetUnit = "BUDGET_UNIT_CURRENCY",
+            MaxBudgetAmountMicros = 5_000_000_000,       // $5,000
+            PacingPeriod = "PACING_PERIOD_FLIGHT",
+            PacingType = "PACING_TYPE_AHEAD",
+            FixedBidAmountMicros = 2_000_000,            // $2.00 fixed CPM
+            ContainsEuPoliticalAds = "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+            FrequencyCapUnlimited = false,
+            FrequencyCapMaxImpressions = 5,
+            FrequencyCapTimeUnit = "TIME_UNIT_DAYS",
+            FrequencyCapTimeUnitCount = 1,
+            Targeting = new Dv360LineItemTargeting
+            {
+                GeoTargets =
+                [
+                    new Dv360GeoTargeting { TargetingOptionId = kenya!.TargetingOptionId }
+                ],
+                DeviceTypeTargets =
+                [
+                    new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_COMPUTER" },
+                    new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" }
+                ],
+                ContentLabelExclusions =
+                [
+                    new Dv360ContentLabelExclusionTargeting
+                    {
+                        ContentLabelType = "CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE"
+                    },
+                    new Dv360ContentLabelExclusionTargeting
+                    {
+                        ContentLabelType = "CONTENT_LABEL_TYPE_PROFANITY"
+                    }
+                ],
+                ViewabilityTargets =
+                [
+                    new Dv360ViewabilityTargeting
+                    {
+                        TargetingOptionId = "VIEWABILITY_40_PERCENT_OR_MORE"
+                    }
+                ]
+            }
+        },
+        new Dv360LineItem
+        {
+            DisplayName = "Display - Nairobi Only, Tablet",
+            LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
+            EntityStatus = "ENTITY_STATUS_DRAFT",
+            FlightDateType = "LINE_ITEM_FLIGHT_DATE_TYPE_INHERITED",
+            MaxBudgetAmountMicros = 5_000_000_000,
+            FixedBidAmountMicros = 1_500_000,
+            Targeting = new Dv360LineItemTargeting
+            {
+                GeoTargets =
+                [
+                    new Dv360GeoTargeting { TargetingOptionId = nairobi!.TargetingOptionId }
+                ],
+                DeviceTypeTargets =
+                [
+                    new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_TABLET" }
+                ]
+            }
+        }
+    ]
+};
+
+var result = await workflow.ExecuteAsync(request);
+
+Console.WriteLine($"Campaign: {result.Campaign.CampaignId}");
+Console.WriteLine($"IO:       {result.InsertionOrder.InsertionOrderId}");
+foreach (var c in result.Creatives)
+    Console.WriteLine($"Creative: {c.CreativeId} ({c.DisplayName})");
+foreach (var li in result.LineItems)
+    Console.WriteLine($"LineItem: {li.LineItemId} ({li.DisplayName})");
+```
+
+### Example 2: Using Individual Services (Without Workflow)
+
+```csharp
+// Create a campaign manually
+var campaign = await campaignService.CreateAsync(advertiserId, new Dv360Campaign
+{
+    DisplayName = "Manual Campaign",
+    GoalType = "CAMPAIGN_GOAL_TYPE_DRIVE_ONLINE_ACTION",
+    PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPA",
+    PerformanceGoalAmountMicros = 5_000_000,    // $5.00 CPA
+    BudgetAmountMicros = 50_000_000_000,         // $50,000
+    StartDate = new DateOnly(2025, 8, 1),
+    EndDate = new DateOnly(2025, 12, 31),
+});
+
+// Create IO
+var io = await insertionOrderService.CreateAsync(advertiserId, new Dv360InsertionOrder
+{
+    CampaignId = campaign.CampaignId!.Value,
+    DisplayName = "Manual IO",
+    BudgetAmountMicros = 25_000_000_000,
+    StartDate = new DateOnly(2025, 8, 1),
+    EndDate = new DateOnly(2025, 10, 31),
+    KpiType = "KPI_TYPE_CPA",
+    KpiAmountMicros = 5_000_000,
+});
+
+// Create line item with auto-bidding
+var lineItem = await lineItemService.CreateAsync(advertiserId, new Dv360LineItem
+{
+    CampaignId = campaign.CampaignId!.Value,
+    InsertionOrderId = io.InsertionOrderId!.Value,
+    DisplayName = "Auto-Bid Line Item",
+    LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
+    MaxBudgetAmountMicros = 10_000_000_000,
+    StartDate = new DateOnly(2025, 8, 1),
+    EndDate = new DateOnly(2025, 10, 31),
+    MaximizeSpendPerformanceGoalType = "BIDDING_STRATEGY_PERFORMANCE_GOAL_TYPE_CPC",
+    MaxAverageCpmBidAmountMicros = 3_000_000,   // $3.00 CPM cap
+});
+
+// Assign targeting separately
+await targetingService.AssignTargetingAsync(advertiserId, lineItem.LineItemId!.Value,
+    new Dv360LineItemTargeting
+    {
+        GeoTargets = [new Dv360GeoTargeting { TargetingOptionId = "2840" }], // US
+        DeviceTypeTargets =
+        [
+            new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_COMPUTER" },
+            new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" },
+            new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_TABLET" }
+        ]
+    });
+
+// Create and link creative
+var creative = await creativeService.CreateAsync(advertiserId, new Dv360Creative
+{
+    DisplayName = "Performance Banner",
+    CreativeType = "CREATIVE_TYPE_STANDARD",
+    HostingSource = "HOSTING_SOURCE_THIRD_PARTY",
+    WidthPixels = 300,
+    HeightPixels = 250,
+    ThirdPartyTag = "<script src='https://ads.example.com/tag.js'></script>",
+    ExitEvents = [new Dv360ExitEvent { Url = "https://example.com/signup" }]
+});
+
+await lineItemService.AssignCreativeAsync(
+    advertiserId,
+    lineItem.LineItemId!.Value,
+    creative.CreativeId!.Value);
+```
+
+### Example 3: Listing and Filtering
+
+```csharp
+// List all active campaigns
+var campaigns = await campaignService.ListAsync(advertiserId, new CampaignListOptions
+{
+    Filter = "entityStatus=\"ENTITY_STATUS_ACTIVE\"",
+    OrderBy = "updateTime desc",
+    PageSize = 50
+});
+
+foreach (var c in campaigns)
+    Console.WriteLine($"{c.CampaignId}: {c.DisplayName} ({c.EntityStatus})");
+
+// List line items for a specific IO
+var lineItems = await lineItemService.ListAsync(advertiserId, new LineItemListOptions
+{
+    Filter = $"insertionOrderId=\"{ioId}\"",
+    OrderBy = "displayName"
+});
+
+// Get a specific campaign
+var campaign = await campaignService.GetAsync(advertiserId, campaignId);
+if (campaign is not null)
+    Console.WriteLine($"Found: {campaign.DisplayName}");
+```
+
+### Example 4: Geo Region Lookup
+
+```csharp
+// Search for geo regions
+var results = await geoService.SearchAsync(advertiserId, "New York");
+foreach (var geo in results)
+    Console.WriteLine($"{geo.DisplayName} ({geo.GeoRegionType}) ? {geo.TargetingOptionId}");
+
+// Output might include:
+// New York (GEO_REGION_TYPE_REGION) ? 21167
+// New York (GEO_REGION_TYPE_CITY) ? 1023191
+// New York (GEO_REGION_TYPE_DMA_REGION) ? 501
+
+// Find exact match
+var us = await geoService.FindByNameAsync(advertiserId, "United States");
+var uk = await geoService.FindByNameAsync(advertiserId, "United Kingdom");
+
+// Use in targeting with inclusion/exclusion
+var targeting = new Dv360LineItemTargeting
+{
+    GeoTargets =
+    [
+        new Dv360GeoTargeting { TargetingOptionId = us!.TargetingOptionId, Negative = false },  // Target US
+        new Dv360GeoTargeting { TargetingOptionId = uk!.TargetingOptionId, Negative = true }    // Exclude UK
+    ]
+};
+```
+
+---
+
+## 11. Error Handling
+
+All service methods throw `Dv360ApiException` when the DV360 API returns an error. This exception wraps the underlying Google API error details.
+
+### Exception Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Message` | `string` | Human-readable error description |
+| `HttpStatusCode` | `int?` | HTTP status code (e.g., 400, 403, 404, 429) |
+| `GoogleErrorBody` | `string?` | Serialized Google error payload |
+| `InnerException` | `Exception` | The original `GoogleApiException` |
+
+### Common HTTP Status Codes
+
+| Code | Meaning | Typical Cause |
+|------|---------|---------------|
+| 400 | Bad Request | Invalid field values, missing required fields |
+| 401 | Unauthorized | Expired or invalid credentials |
+| 403 | Forbidden | Insufficient permissions on the advertiser |
+| 404 | Not Found | Resource doesn't exist (returned as `null` by `GetAsync`) |
+| 409 | Conflict | Resource already exists or state conflict |
+| 429 | Too Many Requests | API rate limit exceeded |
+| 500 | Internal Server Error | DV360 server-side issue (retry) |
+
+### Error Handling Pattern
+
+```csharp
+using Suss.Dv360.Client.Exceptions;
+
+try
+{
+    var result = await workflow.ExecuteAsync(request);
+}
+catch (Dv360ApiException ex) when (ex.HttpStatusCode == 400)
+{
+    Console.WriteLine($"Bad request: {ex.Message}");
+    Console.WriteLine($"Google error: {ex.GoogleErrorBody}");
+}
+catch (Dv360ApiException ex) when (ex.HttpStatusCode == 403)
+{
+    Console.WriteLine($"Permission denied. Verify advertiser access: {ex.Message}");
+}
+catch (Dv360ApiException ex) when (ex.HttpStatusCode == 429)
+{
+    Console.WriteLine($"Rate limited. Retry after delay: {ex.Message}");
+}
+catch (Dv360ApiException ex)
+{
+    Console.WriteLine($"DV360 API error ({ex.HttpStatusCode}): {ex.Message}");
+}
+```
+
+---
+
+## 12. Micros Conversion Guide
+
+The DV360 API uses **micros** for all monetary values: **1 currency unit = 1,000,000 micros**.
+
+| Currency Amount | Micros Value | C# Literal |
+|----------------|-------------|-------------|
+| $0.01 | 10,000 | `10_000` |
+| $0.50 | 500,000 | `500_000` |
+| $1.00 | 1,000,000 | `1_000_000` |
+| $1.50 | 1,500,000 | `1_500_000` |
+| $2.00 | 2,000,000 | `2_000_000` |
+| $10.00 | 10,000,000 | `10_000_000` |
+| $50.00 | 50,000,000 | `50_000_000` |
+| $100.00 | 100,000,000 | `100_000_000` |
+| $500.00 | 500,000,000 | `500_000_000` |
+| $1,000.00 | 1,000,000,000 | `1_000_000_000` |
+| $10,000.00 | 10,000,000,000 | `10_000_000_000` |
+| $50,000.00 | 50,000,000,000 | `50_000_000_000` |
+
+### Conversion Formulas
+
+```csharp
+// Dollars to micros
+long micros = (long)(dollarAmount * 1_000_000);
+
+// Micros to dollars
+decimal dollars = micros / 1_000_000m;
+```
+
+### Percentage Micros (for Performance Goals)
+
+For percentage-based goals, the value is in micros of the percentage:
+
+| Percentage | Micros Value | C# Literal |
+|-----------|-------------|-------------|
+| 1% | 10,000 | `10_000` |
+| 5% | 50,000 | `50_000` |
+| 7% | 70,000 | `70_000` |
+| 10% | 100,000 | `100_000` |
+| 50% | 500,000 | `500_000` |
+
+---
+
+## Appendix: NuGet Namespace Reference
+
+| Namespace | Contents |
+|-----------|----------|
+| `Suss.Dv360.Client.Configuration` | `ServiceCollectionExtensions`, `Dv360ClientOptions`, `AuthMode` |
+| `Suss.Dv360.Client.Models` | All model classes (`Dv360Campaign`, `Dv360LineItem`, etc.) |
+| `Suss.Dv360.Client.Services` | All service interfaces (`ICampaignService`, etc.) |
+| `Suss.Dv360.Client.Exceptions` | `Dv360ApiException` |
+
+---
+
+*Generated for Suss.Dv360.Client targeting .NET 10 with Google DV360 API v4.*
