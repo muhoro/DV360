@@ -22,6 +22,7 @@ namespace Suss.Dv360.Client.Services;
 /// <param name="logger">Logger for structured diagnostic output.</param>
 internal sealed class AssetService(
     IDisplayVideoServiceFactory serviceFactory,
+    IHttpClientFactory httpClientFactory,
     ILogger<AssetService> logger) : IAssetService
 {
     /// <summary>
@@ -47,26 +48,64 @@ internal sealed class AssetService(
     /// <inheritdoc />
     public async Task<Dv360CreativeAsset> UploadAsync(long advertiserId, Dv360CreativeAsset asset, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(asset.FilePath))
-            throw new InvalidOperationException("FilePath must be set on the asset before uploading.");
+        var hasFilePath = !string.IsNullOrWhiteSpace(asset.FilePath);
+        var hasUrl = !string.IsNullOrWhiteSpace(asset.Url);
+
+        if (!hasFilePath && !hasUrl)
+            throw new InvalidOperationException("Either FilePath or Url must be set on the asset before uploading.");
 
         if (string.IsNullOrWhiteSpace(asset.MimeType))
             throw new InvalidOperationException("MimeType must be set on the asset before uploading.");
 
-        // Derive the filename from the file path if not explicitly provided.
-        var filename = asset.Filename ?? Path.GetFileName(asset.FilePath);
+        // If a URL is provided, download to a temporary file first.
+        string? tempFilePath = null;
+        string effectiveFilePath;
 
-        // The DV360 API requires the filename to be UTF-8 encoded with a maximum size of 240 bytes.
-        ValidateFilename(filename);
+        if (hasUrl)
+        {
+            tempFilePath = Path.GetTempFileName();
+            effectiveFilePath = tempFilePath;
 
-        // Validate the file exists and its size is within the DV360 API limits for the given MIME type.
-        ValidateFileSize(asset.FilePath, asset.MimeType);
+            logger.LogInformation("Downloading asset from URL '{Url}' for advertiser {AdvertiserId}",
+                asset.Url, advertiserId);
 
-        logger.LogInformation("Uploading asset '{Filename}' ({MimeType}) for advertiser {AdvertiserId}",
-            filename, asset.MimeType, advertiserId);
+            try
+            {
+                var httpClient = httpClientFactory.CreateClient();
+                using var response = await httpClient.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
+
+                await using var downloadStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write);
+                await downloadStream.CopyToAsync(fileStream, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                CleanupTempFile(tempFilePath);
+                throw new InvalidOperationException($"Failed to download asset from URL '{asset.Url}'.", ex);
+            }
+        }
+        else
+        {
+            effectiveFilePath = asset.FilePath!;
+        }
 
         try
         {
+            // Derive the filename: explicit > URL path segment > file path.
+            var filename = asset.Filename
+                ?? (hasUrl ? GetFilenameFromUrl(asset.Url!) : null)
+                ?? Path.GetFileName(effectiveFilePath);
+
+            // The DV360 API requires the filename to be UTF-8 encoded with a maximum size of 240 bytes.
+            ValidateFilename(filename);
+
+            // Validate the file size is within the DV360 API limits for the given MIME type.
+            ValidateFileSize(effectiveFilePath, asset.MimeType);
+
+            logger.LogInformation("Uploading asset '{Filename}' ({MimeType}) for advertiser {AdvertiserId}",
+                filename, asset.MimeType, advertiserId);
+
             var service = await serviceFactory.CreateAsync(cancellationToken);
 
             var body = new GoogleData.CreateAssetRequest
@@ -75,8 +114,8 @@ internal sealed class AssetService(
             };
 
             // Open the file and stream it to DV360 via the resumable upload endpoint.
-            await using var fileStream = new FileStream(asset.FilePath, FileMode.Open, FileAccess.Read);
-            var uploadRequest = service.Advertisers.Assets.Upload(body, advertiserId, fileStream, asset.MimeType);
+            await using var uploadFileStream = new FileStream(effectiveFilePath, FileMode.Open, FileAccess.Read);
+            var uploadRequest = service.Advertisers.Assets.Upload(body, advertiserId, uploadFileStream, asset.MimeType);
             var uploadResult = await uploadRequest.UploadAsync(cancellationToken);
 
             if (uploadResult.Status != UploadStatus.Completed)
@@ -98,8 +137,12 @@ internal sealed class AssetService(
         }
         catch (GoogleApiException ex)
         {
-            logger.LogError(ex, "Failed to upload asset '{Filename}' for advertiser {AdvertiserId}", filename, advertiserId);
-            throw new Dv360ApiException($"Failed to upload asset '{filename}' for advertiser {advertiserId}.", ex);
+            logger.LogError(ex, "Failed to upload asset for advertiser {AdvertiserId}", advertiserId);
+            throw new Dv360ApiException($"Failed to upload asset for advertiser {advertiserId}.", ex);
+        }
+        finally
+        {
+            CleanupTempFile(tempFilePath);
         }
     }
 
@@ -162,5 +205,35 @@ internal sealed class AssetService(
 
         // Unknown MIME types are not validated for size — the API will reject them if needed.
         return (null, "unknown");
+    }
+
+    /// <summary>
+    /// Extracts a filename from a URL's path segment, falling back to <c>"asset"</c> if
+    /// the URL does not contain a recognizable filename.
+    /// </summary>
+    private static string GetFilenameFromUrl(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var lastSegment = uri.Segments.LastOrDefault()?.Trim('/');
+            return !string.IsNullOrWhiteSpace(lastSegment) ? lastSegment : "asset";
+        }
+        catch
+        {
+            return "asset";
+        }
+    }
+
+    /// <summary>
+    /// Safely deletes a temporary file if it exists.
+    /// </summary>
+    private static void CleanupTempFile(string? tempFilePath)
+    {
+        if (tempFilePath is not null)
+        {
+            try { File.Delete(tempFilePath); }
+            catch { /* best-effort cleanup */ }
+        }
     }
 }

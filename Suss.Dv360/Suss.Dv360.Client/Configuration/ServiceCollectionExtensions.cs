@@ -51,6 +51,8 @@ public static class ServiceCollectionExtensions
                 throw new ArgumentException($"Unsupported auth mode: {options.AuthMode}");
         }
 
+        services.AddHttpClient();
+
         // The factory is a singleton because it caches the authenticated DisplayVideoService instance.
         services.AddSingleton<IDisplayVideoServiceFactory, DisplayVideoServiceFactory>();
 
