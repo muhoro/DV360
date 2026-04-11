@@ -37,10 +37,19 @@ var app = builder.Build();
 // Create a DI scope to resolve scoped services (resource services are registered as scoped).
 using var scope = app.Services.CreateScope();
 var workflow = scope.ServiceProvider.GetRequiredService<ICampaignWorkflowService>();
+var geoRegionService = scope.ServiceProvider.GetRequiredService<IGeoRegionService>();
 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
 // Read the target advertiser ID from configuration.
 var advertiserId = long.Parse(builder.Configuration["Dv360:AdvertiserId"] ?? "0");
+
+// Resolve geo-region targeting option IDs by name instead of hard-coding.
+// Use IGeoRegionService to look up any country, city, region, DMA, or postal code.
+var geo = await geoRegionService.FindByNameAsync(advertiserId, "Kenya")
+    ?? throw new InvalidOperationException("Could not find geo-region targeting option for 'United States'.");
+
+logger.LogInformation("Resolved '{DisplayName}' → TargetingOptionId={TargetingOptionId} ({GeoRegionType})",
+    geo.DisplayName, geo.TargetingOptionId, geo.GeoRegionType);
 
 // Build the workflow request with sample data for smoke testing.
 // All monetary values are in micros (1 currency unit = 1,000,000 micros).
@@ -57,7 +66,9 @@ var request = new CampaignWorkflowRequest
         StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
         EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
         EntityStatus = "ENTITY_STATUS_PAUSED",
-        //BudgetUnit = "BUDGET_UNIT_CURRENCY",
+        BudgetUnit = "BUDGET_UNIT_CURRENCY",BudgetDisplayName = "Total Campaign Budget",
+        PlannedSpendAmountMicros = 1_000_000_000          // $1,000.00 planned spend (optional)
+
     },
     Creatives =
     [
@@ -95,10 +106,11 @@ var request = new CampaignWorkflowRequest
         StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
         EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
         PacingPeriod = "PACING_PERIOD_FLIGHT",
-        PacingType = "PACING_TYPE_AHEAD", // PACING_PERIOD_FLIGHT
-        DailyMaxMicros = 500_000_000,                         // $500.00 daily cap
+        PacingType = "PACING_TYPE_AHEAD",
+        DailyMaxMicros = 50_000_000,                         // $50.00 daily cap
         KpiType = "KPI_TYPE_CPM",
-        KpiAmountMicros = 1_000_000                           // $1.00 CPM target
+        KpiAmountMicros = 1_000_000,                           // $1.00 CPM target
+        OptimizationObjective = "NO_OBJECTIVE"
     },
     LineItems =
     [
@@ -116,10 +128,10 @@ var request = new CampaignWorkflowRequest
             FixedBidAmountMicros = 2_000_000,                 // $2.00 fixed CPM bid
             Targeting = new Dv360LineItemTargeting
             {
-                // Target United States (geo-region ID 2840).
+                // Target United States — resolved dynamically via IGeoRegionService.
                 GeoTargets =
                 [
-                    new Dv360GeoTargeting { TargetingOptionId = "2840", Negative = false }
+                    new Dv360GeoTargeting { TargetingOptionId = geo.TargetingOptionId, Negative = false }
                 ],
                 // Target desktop and mobile devices.
                 DeviceTypeTargets =
@@ -128,12 +140,18 @@ var request = new CampaignWorkflowRequest
                     new Dv360DeviceTypeTargeting { DeviceType = "DEVICE_TYPE_SMART_PHONE" }
                 ],
                 // Exclude sexually suggestive and profanity content for brand safety.
-                ContentLabelExclusions =
-                [
-                    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE" },
-                    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_PROFANITY" }
-                ]
-            }
+                //ContentLabelExclusions =
+                //[
+                //    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_SEXUALLY_SUGGESTIVE" },
+                //    new Dv360ContentLabelExclusionTargeting { ContentLabelType = "CONTENT_LABEL_TYPE_PROFANITY" }
+                //]
+            },
+            ContainsEuPoliticalAds = "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+            FrequencyCapUnlimited = true,
+            FlightDateType = "LINE_ITEM_FLIGHT_DATE_TYPE_INHERITED",
+            PartnerRevenueModelMarkupType = "PARTNER_REVENUE_MODEL_MARKUP_TYPE_TOTAL_MEDIA_COST_MARKUP",
+            PartnerRevenueModelMarkupAmount = 0,
+            ExcludeNewExchanges = false
         }
     ]
 };

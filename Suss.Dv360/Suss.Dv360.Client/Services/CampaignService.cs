@@ -11,8 +11,8 @@ namespace Suss.Dv360.Client.Services;
 /// Internal implementation of <see cref="ICampaignService"/> that manages DV360 campaigns
 /// via the Google Display &amp; Video 360 SDK.
 /// <para>
-/// Handles the mapping between the library’s flat <see cref="Dv360Campaign"/> model and
-/// the Google SDK’s nested <c>Campaign</c> structure (which includes <c>CampaignGoal</c>
+/// Handles the mapping between the library's flat <see cref="Dv360Campaign"/> model and
+/// the Google SDK's nested <c>Campaign</c> structure (which includes <c>CampaignGoal</c>
 /// and <c>CampaignFlight</c> sub-objects). All <see cref="GoogleApiException"/> errors
 /// are caught and re-thrown as <see cref="Dv360ApiException"/>.
 /// </para>
@@ -40,17 +40,11 @@ internal sealed class CampaignService(
                 CampaignGoal = new GoogleData.CampaignGoal
                 {
                     CampaignGoalType = campaign.GoalType,
-                    // Only create a PerformanceGoal sub-object when a goal type is specified.
-                    PerformanceGoal = campaign.PerformanceGoalType is not null
-                        ? new GoogleData.PerformanceGoal
-                        {
-                            PerformanceGoalType = campaign.PerformanceGoalType,
-                            PerformanceGoalAmountMicros = campaign.PerformanceGoalAmountMicros
-                        }
-                        : null
+                    PerformanceGoal = BuildPerformanceGoal(campaign)
                 },
                 CampaignFlight = new GoogleData.CampaignFlight
                 {
+                    PlannedSpendAmountMicros = campaign.PlannedSpendAmountMicros,
                     PlannedDates = new GoogleData.DateRange
                     {
                         StartDate = GoogleTypeMapper.ToGoogleDate(campaign.StartDate),
@@ -60,14 +54,13 @@ internal sealed class CampaignService(
                 FrequencyCap = new GoogleData.FrequencyCap
                 {
                     Unlimited = true,
-                    //TimeUnit = "TIME_UNIT_LIFETIME"
                 },
                 // DV360 API v4 requires at least one CampaignBudget with a valid date range.
                 CampaignBudgets =
                 [
                     new GoogleData.CampaignBudget
                     {
-                        DisplayName = "Total Campaign Budget", // <--- Likely MISSING
+                        DisplayName = campaign.BudgetDisplayName,
                         BudgetAmountMicros = campaign.BudgetAmountMicros,
                         BudgetUnit = campaign.BudgetUnit,
                         ExternalBudgetSource = "EXTERNAL_BUDGET_SOURCE_NONE",
@@ -119,7 +112,11 @@ internal sealed class CampaignService(
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Dv360Campaign>> ListAsync(long advertiserId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<Dv360Campaign>> ListAsync(long advertiserId, CancellationToken cancellationToken = default)
+        => ListAsync(advertiserId, options: null, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Dv360Campaign>> ListAsync(long advertiserId, CampaignListOptions? options, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -132,6 +129,15 @@ internal sealed class CampaignService(
             {
                 var request = service.Advertisers.Campaigns.List(advertiserId);
                 request.PageToken = pageToken;
+
+                if (options?.PageSize is not null)
+                    request.PageSize = options.PageSize;
+
+                if (!string.IsNullOrEmpty(options?.OrderBy))
+                    request.OrderBy = options.OrderBy;
+
+                if (!string.IsNullOrEmpty(options?.Filter))
+                    request.Filter = options.Filter;
 
                 var result = await request.ExecuteAsync(cancellationToken);
                 if (result.Campaigns is not null)
@@ -148,8 +154,107 @@ internal sealed class CampaignService(
         }
     }
 
+    /// <inheritdoc />
+    public async Task<Dv360Campaign> PatchAsync(long advertiserId, long campaignId, Dv360Campaign campaign, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Patching campaign {CampaignId} for advertiser {AdvertiserId}", campaignId, advertiserId);
+
+        try
+        {
+            var service = await serviceFactory.CreateAsync(cancellationToken);
+
+            var body = new GoogleData.Campaign
+            {
+                DisplayName = campaign.DisplayName,
+                EntityStatus = campaign.EntityStatus,
+                CampaignGoal = new GoogleData.CampaignGoal
+                {
+                    CampaignGoalType = campaign.GoalType,
+                    PerformanceGoal = BuildPerformanceGoal(campaign)
+                },
+                CampaignFlight = new GoogleData.CampaignFlight
+                {
+                    PlannedSpendAmountMicros = campaign.PlannedSpendAmountMicros,
+                    PlannedDates = new GoogleData.DateRange
+                    {
+                        StartDate = GoogleTypeMapper.ToGoogleDate(campaign.StartDate),
+                        EndDate = GoogleTypeMapper.ToGoogleDate(campaign.EndDate)
+                    }
+                },
+                FrequencyCap = new GoogleData.FrequencyCap
+                {
+                    Unlimited = true,
+                },
+                CampaignBudgets =
+                [
+                    new GoogleData.CampaignBudget
+                    {
+                        DisplayName = campaign.BudgetDisplayName,
+                        BudgetAmountMicros = campaign.BudgetAmountMicros,
+                        BudgetUnit = campaign.BudgetUnit,
+                        ExternalBudgetSource = "EXTERNAL_BUDGET_SOURCE_NONE",
+                        DateRange = new GoogleData.DateRange
+                        {
+                            StartDate = GoogleTypeMapper.ToGoogleDate(campaign.StartDate),
+                            EndDate = GoogleTypeMapper.ToGoogleDate(campaign.EndDate)
+                        }
+                    }
+                ]
+            };
+
+            var request = service.Advertisers.Campaigns.Patch(body, advertiserId, campaignId);
+            request.UpdateMask = "displayName,entityStatus,campaignGoal,campaignFlight,frequencyCap,campaignBudgets";
+            var result = await request.ExecuteAsync(cancellationToken);
+
+            campaign.CampaignId = result.CampaignId;
+            logger.LogInformation("Patched campaign {CampaignId} for advertiser {AdvertiserId}", result.CampaignId, advertiserId);
+
+            return campaign;
+        }
+        catch (GoogleApiException ex)
+        {
+            logger.LogError(ex, "Failed to patch campaign {CampaignId} for advertiser {AdvertiserId}", campaignId, advertiserId);
+            throw new Dv360ApiException($"Failed to patch campaign {campaignId} for advertiser {advertiserId}.", ex);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(long advertiserId, long campaignId, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Deleting campaign {CampaignId} for advertiser {AdvertiserId}", campaignId, advertiserId);
+
+        try
+        {
+            var service = await serviceFactory.CreateAsync(cancellationToken);
+            var request = service.Advertisers.Campaigns.Delete(advertiserId, campaignId);
+            await request.ExecuteAsync(cancellationToken);
+
+            logger.LogInformation("Deleted campaign {CampaignId} for advertiser {AdvertiserId}", campaignId, advertiserId);
+        }
+        catch (GoogleApiException ex)
+        {
+            logger.LogError(ex, "Failed to delete campaign {CampaignId} for advertiser {AdvertiserId}", campaignId, advertiserId);
+            throw new Dv360ApiException($"Failed to delete campaign {campaignId} for advertiser {advertiserId}.", ex);
+        }
+    }
+
     /// <summary>
-    /// Maps a Google SDK <see cref="GoogleData.Campaign"/> to the library’s flat
+    /// Builds a <see cref="GoogleData.PerformanceGoal"/> from the flat campaign model,
+    /// mapping the correct union value field based on the performance goal type.
+    /// </summary>
+    private static GoogleData.PerformanceGoal BuildPerformanceGoal(Dv360Campaign campaign)
+    {
+        return new GoogleData.PerformanceGoal
+        {
+            PerformanceGoalType = campaign.PerformanceGoalType,
+            PerformanceGoalAmountMicros = campaign.PerformanceGoalAmountMicros,
+            PerformanceGoalPercentageMicros = campaign.PerformanceGoalPercentageMicros,
+            PerformanceGoalString = campaign.PerformanceGoalString
+        };
+    }
+
+    /// <summary>
+    /// Maps a Google SDK <see cref="GoogleData.Campaign"/> to the library's flat
     /// <see cref="Dv360Campaign"/> model by extracting nested goal and flight data.
     /// </summary>
     private static Dv360Campaign MapFromGoogle(GoogleData.Campaign c)
@@ -163,10 +268,14 @@ internal sealed class CampaignService(
             DisplayName = c.DisplayName ?? string.Empty,
             EntityStatus = c.EntityStatus ?? "ENTITY_STATUS_UNSPECIFIED",
             GoalType = c.CampaignGoal?.CampaignGoalType ?? string.Empty,
-            PerformanceGoalType = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalType,
+            PerformanceGoalType = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalType ?? string.Empty,
             PerformanceGoalAmountMicros = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalAmountMicros,
+            PerformanceGoalPercentageMicros = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalPercentageMicros,
+            PerformanceGoalString = c.CampaignGoal?.PerformanceGoal?.PerformanceGoalString,
+            BudgetDisplayName = budget?.DisplayName ?? "Total Campaign Budget",
             BudgetUnit = budget?.BudgetUnit ?? "BUDGET_UNIT_CURRENCY",
             BudgetAmountMicros = budget?.BudgetAmountMicros ?? 0,
+            PlannedSpendAmountMicros = c.CampaignFlight?.PlannedSpendAmountMicros,
             StartDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.StartDate),
             EndDate = GoogleTypeMapper.FromGoogleDate(c.CampaignFlight?.PlannedDates?.EndDate)
         };

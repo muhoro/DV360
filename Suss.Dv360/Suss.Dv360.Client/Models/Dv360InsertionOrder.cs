@@ -96,5 +96,4 @@ public sealed class Dv360InsertionOrder
     public string OptimizationObjective { get; set; } = "NO_OBJECTIVE";
 
     public string TimeUnit { get; set; } = "TIME_UNIT_LIFETIME";
-    //TIME_UNIT_LIFETIME
 }

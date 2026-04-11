@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInsertionOrderService, InsertionOrderService>();
         services.AddScoped<ILineItemService, LineItemService>();
         services.AddScoped<ITargetingService, TargetingService>();
+        services.AddScoped<IGeoRegionService, GeoRegionService>();
         services.AddScoped<ICampaignWorkflowService, CampaignWorkflowService>();
 
         return services;
