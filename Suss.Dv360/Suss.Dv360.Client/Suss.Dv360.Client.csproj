@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Google.Apis.DisplayVideo.v4" Version="1.73.0.4107" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.5" />
   </ItemGroup>

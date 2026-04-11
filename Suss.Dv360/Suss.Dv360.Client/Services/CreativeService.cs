@@ -46,7 +46,7 @@ internal sealed class CreativeService(
 
                 foreach (var asset in creative.Assets)
                 {
-                    if (!string.IsNullOrWhiteSpace(asset.FilePath))
+                    if (!string.IsNullOrWhiteSpace(asset.FilePath) || !string.IsNullOrWhiteSpace(asset.Url))
                     {
                         await assetService.UploadAsync(advertiserId, asset, cancellationToken);
                     }
