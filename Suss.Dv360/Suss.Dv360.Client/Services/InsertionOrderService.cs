@@ -39,6 +39,8 @@ internal sealed class InsertionOrderService(
                 CampaignId = insertionOrder.CampaignId,
                 DisplayName = insertionOrder.DisplayName,
                 EntityStatus = insertionOrder.EntityStatus,
+                // DV360 API v4 requires an optimization objective on every insertion order.
+                OptimizationObjective = insertionOrder.OptimizationObjective,
                 Budget = new GoogleData.InsertionOrderBudget
                 {
                     BudgetUnit = insertionOrder.BudgetUnit,
@@ -68,6 +70,11 @@ internal sealed class InsertionOrderService(
                 {
                     KpiType = insertionOrder.KpiType,
                     KpiAmountMicros = insertionOrder.KpiAmountMicros
+                },
+                FrequencyCap = new GoogleData.FrequencyCap
+                {
+                    Unlimited = true,
+                    //TimeUnit = "TIME_UNIT_LIFETIME"
                 }
             };
 
@@ -164,7 +171,8 @@ internal sealed class InsertionOrderService(
             PacingType = io.Pacing?.PacingType ?? "PACING_TYPE_UNSPECIFIED",
             DailyMaxMicros = io.Pacing?.DailyMaxMicros ?? 0,
             KpiType = io.Kpi?.KpiType ?? "KPI_TYPE_UNSPECIFIED",
-            KpiAmountMicros = io.Kpi?.KpiAmountMicros
+            KpiAmountMicros = io.Kpi?.KpiAmountMicros,
+            OptimizationObjective = io.OptimizationObjective ?? "OPTIMIZATION_OBJECTIVE_UNSPECIFIED"
         };
     }
 }

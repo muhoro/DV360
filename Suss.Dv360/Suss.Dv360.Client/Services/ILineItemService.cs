@@ -42,7 +42,40 @@ public interface ILineItemService
     Task<IReadOnlyList<Dv360LineItem>> ListAsync(long advertiserId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Links a creative to a line item so the creative is served when the line item’s
+    /// Lists line items under the specified advertiser with server-side filtering, sorting,
+    /// and page size control. Handles pagination automatically.
+    /// </summary>
+    /// <param name="advertiserId">The DV360 advertiser ID whose line items to list.</param>
+    /// <param name="options">
+    /// Options controlling filtering, sorting, and page size. Pass <c>null</c> for API defaults.
+    /// </param>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <returns>A read-only collection of matching line items for the advertiser.</returns>
+    /// <exception cref="Exceptions.Dv360ApiException">Thrown when the DV360 API returns an error.</exception>
+    Task<IReadOnlyList<Dv360LineItem>> ListAsync(long advertiserId, LineItemListOptions? options, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing line item under the specified advertiser.
+    /// </summary>
+    /// <param name="advertiserId">The DV360 advertiser ID that owns the line item.</param>
+    /// <param name="lineItemId">The line item identifier to update.</param>
+    /// <param name="lineItem">The updated line item definition.</param>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <returns>The updated <paramref name="lineItem"/> instance with <see cref="Dv360LineItem.LineItemId"/> set.</returns>
+    /// <exception cref="Exceptions.Dv360ApiException">Thrown when the DV360 API returns an error.</exception>
+    Task<Dv360LineItem> PatchAsync(long advertiserId, long lineItemId, Dv360LineItem lineItem, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes a line item.
+    /// </summary>
+    /// <param name="advertiserId">The DV360 advertiser ID that owns the line item.</param>
+    /// <param name="lineItemId">The line item identifier to delete.</param>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <exception cref="Exceptions.Dv360ApiException">Thrown when the DV360 API returns an error.</exception>
+    Task DeleteAsync(long advertiserId, long lineItemId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links a creative to a line item so the creative is served when the line item's
     /// targeting criteria are met.
     /// </summary>
     /// <param name="advertiserId">The DV360 advertiser ID that owns both resources.</param>

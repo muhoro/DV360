@@ -34,16 +34,53 @@ public sealed class Dv360Campaign
     public required string GoalType { get; set; }
 
     /// <summary>
-    /// Optional performance goal type that further qualifies the campaign goal
-    /// (e.g., <c>"PERFORMANCE_GOAL_TYPE_CPM"</c>). <c>null</c> if no performance goal is set.
+    /// The performance goal type that qualifies the campaign goal
+    /// (e.g., <c>"PERFORMANCE_GOAL_TYPE_CPM"</c>).
+    /// Required by the DV360 API. Acceptable values include:
+    /// <c>PERFORMANCE_GOAL_TYPE_CPM</c>, <c>PERFORMANCE_GOAL_TYPE_CPC</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_CPA</c>, <c>PERFORMANCE_GOAL_TYPE_CPIAVC</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_CTR</c>, <c>PERFORMANCE_GOAL_TYPE_VIEWABILITY</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_OTHER</c>.
     /// </summary>
-    public string? PerformanceGoalType { get; set; }
+    public required string PerformanceGoalType { get; set; }
 
     /// <summary>
     /// The target performance goal amount in micros (1/1,000,000 of the currency unit).
-    /// For example, 1 000 000 micros = $1.00. <c>null</c> when no performance goal is defined.
+    /// Applicable when <see cref="PerformanceGoalType"/> is one of:
+    /// <c>PERFORMANCE_GOAL_TYPE_CPM</c>, <c>PERFORMANCE_GOAL_TYPE_CPC</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_CPA</c>, <c>PERFORMANCE_GOAL_TYPE_CPIAVC</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_VCPM</c>.
+    /// For example, 1 500 000 represents 1.5 standard units of the currency.
+    /// Mutually exclusive with <see cref="PerformanceGoalPercentageMicros"/> and <see cref="PerformanceGoalString"/>.
     /// </summary>
     public long? PerformanceGoalAmountMicros { get; set; }
+
+    /// <summary>
+    /// The decimal representation of the goal percentage in micros.
+    /// Applicable when <see cref="PerformanceGoalType"/> is one of:
+    /// <c>PERFORMANCE_GOAL_TYPE_CTR</c>, <c>PERFORMANCE_GOAL_TYPE_VIEWABILITY</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_CLICK_CVR</c>, <c>PERFORMANCE_GOAL_TYPE_IMPRESSION_CVR</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_VTR</c>, <c>PERFORMANCE_GOAL_TYPE_AUDIO_COMPLETION_RATE</c>,
+    /// <c>PERFORMANCE_GOAL_TYPE_VIDEO_COMPLETION_RATE</c>.
+    /// For example, 70000 represents 7% (decimal 0.07).
+    /// Mutually exclusive with <see cref="PerformanceGoalAmountMicros"/> and <see cref="PerformanceGoalString"/>.
+    /// </summary>
+    public long? PerformanceGoalPercentageMicros { get; set; }
+
+    /// <summary>
+    /// A key performance indicator (KPI) string, which can be empty. Must be UTF-8 encoded
+    /// with a length of no more than 100 characters.
+    /// Applicable when <see cref="PerformanceGoalType"/> is <c>PERFORMANCE_GOAL_TYPE_OTHER</c>.
+    /// Mutually exclusive with <see cref="PerformanceGoalAmountMicros"/> and <see cref="PerformanceGoalPercentageMicros"/>.
+    /// </summary>
+    public string? PerformanceGoalString { get; set; }
+
+    /// <summary>
+    /// The display name of the campaign budget. Required by the DV360 API.
+    /// Must be UTF-8 encoded with a maximum size of 240 bytes.
+    /// Defaults to <c>"Total Campaign Budget"</c>.
+    /// </summary>
+    public string BudgetDisplayName { get; set; } = "Total Campaign Budget";
 
     /// <summary>
     /// The budget unit type for the campaign budget
@@ -57,6 +94,14 @@ public sealed class Dv360Campaign
     /// For example, 10 000 000 000 micros = $10,000.00.
     /// </summary>
     public long BudgetAmountMicros { get; set; }
+
+    /// <summary>
+    /// The amount the campaign is expected to spend for its planned dates, in micros.
+    /// Used for tracking spend in the DV360 UI (does not limit serving).
+    /// Must be greater than or equal to 0. <c>null</c> if not specified.
+    /// For example, 500 000 000 represents 500 standard units of the currency.
+    /// </summary>
+    public long? PlannedSpendAmountMicros { get; set; }
 
     /// <summary>
     /// The planned start date of the campaign flight. <c>null</c> for open-ended campaigns.

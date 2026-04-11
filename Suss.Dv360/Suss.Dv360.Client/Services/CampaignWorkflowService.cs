@@ -4,7 +4,7 @@ using Suss.Dv360.Client.Models;
 namespace Suss.Dv360.Client.Services;
 
 /// <summary>
-/// Orchestrates the Phase 1 campaign creation workflow by coordinating the individual
+/// Orchestrates the campaign creation workflow by coordinating the individual
 /// resource services in the correct dependency order.
 /// <para>
 /// Execution flow:
@@ -13,6 +13,7 @@ namespace Suss.Dv360.Client.Services;
 ///   <item><description><b>Step 2</b> – Create the campaign.</description></item>
 ///   <item><description><b>Step 3a</b> – Create the insertion order under the campaign.</description></item>
 ///   <item><description><b>Step 3b</b> – Create all line items under the campaign and IO.</description></item>
+///   <item><description><b>Step 3c</b> – Apply targeting options to line items.</description></item>
 ///   <item><description><b>Step 4</b> – Link every creative to every line item (cross-join).</description></item>
 /// </list>
 /// Parent identifiers are wired automatically between steps so callers only supply
@@ -23,12 +24,14 @@ namespace Suss.Dv360.Client.Services;
 /// <param name="campaignService">Service for managing DV360 campaigns.</param>
 /// <param name="insertionOrderService">Service for managing DV360 insertion orders.</param>
 /// <param name="lineItemService">Service for managing DV360 line items and creative assignments.</param>
+/// <param name="targetingService">Service for managing DV360 line item targeting options.</param>
 /// <param name="logger">Logger for structured diagnostic output at each workflow step.</param>
 internal sealed class CampaignWorkflowService(
     ICreativeService creativeService,
     ICampaignService campaignService,
     IInsertionOrderService insertionOrderService,
     ILineItemService lineItemService,
+    ITargetingService targetingService,
     ILogger<CampaignWorkflowService> logger) : ICampaignWorkflowService
 {
     /// <inheritdoc />
@@ -64,6 +67,20 @@ internal sealed class CampaignWorkflowService(
 
             var created = await lineItemService.CreateAsync(request.AdvertiserId, lineItem, cancellationToken);
             createdLineItems.Add(created);
+        }
+
+        // Step 3c: Assign targeting options to line items that have targeting configured.
+        logger.LogInformation("Step 3c: Assigning targeting options to line items");
+        foreach (var lineItem in createdLineItems)
+        {
+            if (lineItem.Targeting is not null)
+            {
+                await targetingService.AssignTargetingAsync(
+                    request.AdvertiserId,
+                    lineItem.LineItemId!.Value,
+                    lineItem.Targeting,
+                    cancellationToken);
+            }
         }
 
         // Step 4: Link every creative to every line item (full cross-join).
