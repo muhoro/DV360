@@ -59,5 +59,23 @@ public enum ReportGrouping
     /// Group by ad exchange / SSP.
     /// Bid Manager filter: <c>FILTER_EXCHANGE</c> → CSV column: <c>Exchange</c>
     /// </summary>
-    Exchange
+    Exchange,
+
+    /// <summary>
+    /// Group by domain (website) where the ad was served (e.g. "cnn.com").
+    /// Bid Manager filter: <c>FILTER_DOMAIN</c> → CSV column: <c>Domain</c>
+    /// </summary>
+    /// <remarks>
+    /// Only compatible with raw count metrics: <c>METRIC_IMPRESSIONS</c>, <c>METRIC_CLICKS</c>,
+    /// <c>METRIC_MEDIA_COST_ADVERTISER</c>. Calculated metrics (<c>METRIC_CTR</c>,
+    /// <c>METRIC_TOTAL_CONVERSIONS</c>) cause a BadRequest error when combined with this dimension.
+    /// </remarks>
+    Domain,
+
+    /// <summary>
+    /// Group by full app or URL where the ad was served.
+    /// Bid Manager filter: <c>FILTER_APP_URL</c> → CSV column: <c>App/URL</c>
+    /// More granular than <see cref="Domain"/>; same metric restrictions apply.
+    /// </summary>
+    AppUrl
 }

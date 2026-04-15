@@ -82,6 +82,19 @@ public sealed class CampaignReportRow
     /// </summary>
     public string? AdvertiserCurrency { get; set; }
 
+    /// <summary>
+    /// The domain of the site where the ad was served (e.g., "cnn.com").
+    /// Populated when <c>FILTER_DOMAIN</c> is included as a GroupBy dimension.
+    /// </summary>
+    public string? Domain { get; set; }
+
+    /// <summary>
+    /// The full app/URL where the ad was served (e.g., "https://cnn.com/news" or an app bundle ID).
+    /// Populated when <c>FILTER_APP_URL</c> is included as a GroupBy dimension.
+    /// More granular than <see cref="Domain"/>.
+    /// </summary>
+    public string? AppUrl { get; set; }
+
     // ── Delivery Metrics ──────────────────────────────────────────────────
 
     /// <summary>

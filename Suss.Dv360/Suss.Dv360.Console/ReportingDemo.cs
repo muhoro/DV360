@@ -50,18 +50,22 @@ public static class ReportingDemo
         var request = new CampaignReportRequest
         {
             AdvertiserId = advertiserId,
-            CampaignId = campaignId,
-            DateRange = new ReportDateRange
-            {
-                // Use last 30 days of data
-                RelativeDateRange = "LAST_30_DAYS"
-            },
-            // Group results by date for daily breakdown
-            GroupBy = ReportGrouping.Date,
-            Filters = new ReportFilters
-            {
-                // No additional filters - get all data for the advertiser/campaign
-            }
+            CampaignId   = campaignId,
+            DateRange    = new ReportDateRange { RelativeDateRange = "LAST_30_DAYS" },
+
+            // Group by domain to see which websites the campaign ran on.
+            // NOTE: FILTER_DOMAIN only supports raw count metrics — CTR and conversions
+            // are calculated fields that the API rejects at domain-level granularity.
+            // FILTER_APP_URL is the dimension DV360 UI uses for placement/website breakdown.
+            // Cost metrics are excluded — all currency metrics require a currency GroupBy
+            // dimension that is incompatible with placement-level dimensions.
+            GroupBy = ReportGrouping.AppUrl,
+            Metrics =
+            [
+                "METRIC_IMPRESSIONS",
+                "METRIC_CLICKS"
+            ],
+            QueryTitle = $"Campaign Website Report - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
         };
 
         logger.LogInformation("  Date Range: {DateRange}", request.DateRange.RelativeDateRange);
@@ -85,58 +89,34 @@ public static class ReportingDemo
             // ─────────────────────────────────────────────────────────────────
             if (result.Rows.Count > 0)
             {
-                logger.LogInformation("\n📈 Daily Performance Breakdown:");
-                logger.LogInformation("┌────────────┬─────────────┬──────────┬─────────┬────────────────┬───────────┐");
-                logger.LogInformation("│ Date       │ Impressions │ Clicks   │ CTR     │ Media Cost     │ Conv.     │");
-                logger.LogInformation("├────────────┼─────────────┼──────────┼─────────┼────────────────┼───────────┤");
+                logger.LogInformation("\n🌐 Website Performance Breakdown (top 20 by impressions):");
+                logger.LogInformation("┌────────────────────────────────────────────────────┬─────────────┬──────────┐");
+                logger.LogInformation("│ App/URL                                            │ Impressions │ Clicks   │");
+                logger.LogInformation("├────────────────────────────────────────────────────┼─────────────┼──────────┤");
 
-                foreach (var row in result.Rows.OrderBy(r => r.Date).Take(15))
+                foreach (var row in result.Rows.OrderByDescending(r => r.Impressions).Take(20))
                 {
-                    logger.LogInformation("│ {Date,-10} │ {Impressions,11:N0} │ {Clicks,8:N0} │ {CTR,6:P2} │ {MediaCost,14:C2} │ {Conv,9:N0} │",
-                        row.Date?.ToString("yyyy-MM-dd") ?? "N/A",
+                    var site = (row.AppUrl ?? row.Domain ?? "Unknown");
+                    var siteDisplay = site.Length > 50 ? site[..50] : site;
+                    logger.LogInformation("│ {Site,-50} │ {Impressions,11:N0} │ {Clicks,8:N0} │",
+                        siteDisplay,
                         row.Impressions,
-                        row.Clicks,
-                        row.Ctr,
-                        row.MediaCost,
-                        row.TotalConversions);
+                        row.Clicks);
                 }
 
-                if (result.Rows.Count > 15)
-                {
-                    logger.LogInformation("│ ... {More,6} more rows │", result.Rows.Count - 15);
-                }
+                if (result.Rows.Count > 20)
+                    logger.LogInformation("│ ... {More,4} more sites                                                  │", result.Rows.Count - 20);
 
-                logger.LogInformation("└────────────┴─────────────┴──────────┴─────────┴────────────────┴───────────┘");
+                logger.LogInformation("└────────────────────────────────────────────────────┴─────────────┴──────────┘");
 
-                // Summary totals
-                logger.LogInformation("\n📊 Summary Totals:");
                 var totalImpressions = result.Rows.Sum(r => r.Impressions);
-                var totalClicks = result.Rows.Sum(r => r.Clicks);
-                var totalMediaCost = result.Rows.Sum(r => r.MediaCost);
-                var totalConversions = result.Rows.Sum(r => r.TotalConversions);
-                
+                var totalClicks      = result.Rows.Sum(r => r.Clicks);
+
+                logger.LogInformation("\n📊 Summary Totals:");
+                logger.LogInformation("  Total Sites:        {Total:N0}", result.Rows.Count);
                 logger.LogInformation("  Total Impressions:  {Total:N0}", totalImpressions);
                 logger.LogInformation("  Total Clicks:       {Total:N0}", totalClicks);
                 logger.LogInformation("  Overall CTR:        {CTR:P2}", totalClicks / (double)Math.Max(totalImpressions, 1));
-                logger.LogInformation("  Total Media Cost:   {Cost:C2}", totalMediaCost);
-                logger.LogInformation("  Total Conversions:  {Conv:N0}", totalConversions);
-
-                // Derived metrics
-                if (totalImpressions > 0)
-                {
-                    var cpm = (totalMediaCost / totalImpressions) * 1000;
-                    logger.LogInformation("  CPM:                {CPM:C2}", cpm);
-                }
-                if (totalClicks > 0)
-                {
-                    var cpc = totalMediaCost / totalClicks;
-                    logger.LogInformation("  CPC:                {CPC:C2}", cpc);
-                }
-                if (totalConversions > 0)
-                {
-                    var cpa = totalMediaCost / totalConversions;
-                    logger.LogInformation("  CPA:                {CPA:C2}", cpa);
-                }
             }
             else
             {

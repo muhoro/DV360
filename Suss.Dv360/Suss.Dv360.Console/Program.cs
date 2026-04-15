@@ -19,7 +19,7 @@ using Suss.Dv360.Console;
 // Build the host with default logging and configuration from appsettings.json.
 var builder = Host.CreateApplicationBuilder(args);
 
- //Check for subcommand
+//Check for subcommand
 //if (args.Length > 0 && args[0].Equals("bidmanager", StringComparison.OrdinalIgnoreCase))
 //{
 //    var config = builder.Configuration.GetSection("Dv360");
@@ -50,6 +50,23 @@ var builder = Host.CreateApplicationBuilder(args);
 //    await ReportingDemo.RunAsync(reportApp.Services, advId, campaignId);
 //    return;
 //}
+
+builder.Services.AddDv360Client(options =>
+{
+    var config = builder.Configuration.GetSection("Dv360");
+    options.AuthMode = Enum.Parse<AuthMode>(config["AuthMode"] ?? "OAuthUser");
+    options.ServiceAccountKeyPath = config["ServiceAccountKeyPath"];
+    options.OAuthClientId = config["OAuthClientId"];
+    options.OAuthClientSecret = config["OAuthClientSecret"];
+    options.TokenStorePath = config["TokenStorePath"] ?? "tokens";
+});
+
+var reportApp = builder.Build();
+var advId = long.Parse(builder.Configuration["Dv360:AdvertiserId"] ?? "0");
+long? campaignId = 56793523;
+
+await ReportingDemo.RunAsync(reportApp.Services, advId, campaignId);
+return;
 
 // Register all DV360 client services, binding configuration from the "Dv360" section.
 builder.Services.AddDv360Client(options =>

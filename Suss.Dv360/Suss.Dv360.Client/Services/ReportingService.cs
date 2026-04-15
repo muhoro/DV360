@@ -86,6 +86,13 @@ internal sealed class ReportingService(
             // Build the query definition
             var query = BuildQueryDefinition(request);
 
+            // Log the exact query being sent to aid debugging invalid-combination errors
+            logger.LogDebug("Query type:    {Type}", query.Params__?.Type);
+            logger.LogDebug("Query groupBys: [{GroupBys}]", string.Join(", ", query.Params__?.GroupBys ?? []));
+            logger.LogDebug("Query metrics:  [{Metrics}]", string.Join(", ", query.Params__?.Metrics ?? []));
+            logger.LogDebug("Query filters:  [{Filters}]", string.Join(", ", query.Params__?.Filters?.Select(f => $"{f.Type}={f.Value}") ?? []));
+            logger.LogDebug("Query range:    {Range}", query.Metadata?.DataRange?.Range);
+
             // Create the query
             var createRequest = service.Queries.Create(query);
             var createdQuery = await createRequest.ExecuteAsync(cancellationToken);
@@ -291,15 +298,20 @@ internal sealed class ReportingService(
             ReportGrouping.LineItem       => "FILTER_LINE_ITEM",
             ReportGrouping.Creative       => "FILTER_CREATIVE_ID",
             ReportGrouping.Exchange       => "FILTER_EXCHANGE",
+            ReportGrouping.Domain         => "FILTER_DOMAIN",
+            ReportGrouping.AppUrl         => "FILTER_APP_URL",
             _                             => "FILTER_DATE"
         };
 
         groupBys.Add(primaryDimension);
 
-        // FILTER_ADVERTISER_CURRENCY is mandatory whenever cost metrics are included.
-        // The API returns a BadRequest error if it is missing.
-        // CSV column: "Advertiser Currency" (e.g. "USD", "KES")
-        groupBys.Add("FILTER_ADVERTISER_CURRENCY");
+        // FILTER_ADVERTISER_CURRENCY is required when cost metrics are requested, BUT only
+        // for entity/time-based dimensions (Date, Campaign, IO, LineItem, etc.).
+        // Placement-level dimensions (Domain, AppUrl, Exchange) are incompatible with it —
+        // the API returns BadRequest if it is included alongside those dimensions.
+        var requiresCurrencyDimension = request.GroupBy is not (ReportGrouping.Domain or ReportGrouping.AppUrl or ReportGrouping.Exchange);
+        if (requiresCurrencyDimension)
+            groupBys.Add("FILTER_ADVERTISER_CURRENCY");
 
         // Additional dimensions from the request (deduplicated against primary).
         // Accepts friendly aliases or raw FILTER_* names — see MapDimensionName().

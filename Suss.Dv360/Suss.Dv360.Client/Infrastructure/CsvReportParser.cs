@@ -33,11 +33,14 @@ internal sealed class CsvReportParser(ILogger<CsvReportParser> logger) : IReport
         ["Exchange ID"] = (row, value) => row.ExchangeId = ParseLong(value),
         ["Exchange"] = (row, value) => row.ExchangeName = value,
         ["Advertiser Currency"] = (row, value) => row.AdvertiserCurrency = value,  // FILTER_ADVERTISER_CURRENCY
+        ["Domain"] = (row, value) => row.Domain = value,                            // FILTER_DOMAIN
+        ["App/URL"] = (row, value) => row.AppUrl = value,                           // FILTER_APP_URL
 
         // Delivery metrics
         ["Impressions"] = (row, value) => row.Impressions = ParseLong(value) ?? 0,
         ["Clicks"] = (row, value) => row.Clicks = ParseLong(value) ?? 0,
-        ["Media Cost (Advertiser Currency)"] = (row, value) => row.MediaCostMicros = ParseMicros(value),
+        ["Media Cost (Advertiser Currency)"] = (row, value) => row.MediaCostMicros = ParseMicros(value),  // METRIC_MEDIA_COST_ADVERTISER
+        ["Media Cost (USD)"] = (row, value) => row.MediaCostMicros = ParseMicros(value),                  // METRIC_MEDIA_COST_USD (placement-level reports)
         ["Revenue (Advertiser Currency)"] = (row, value) => row.RevenueMicros = ParseMicros(value),
 
         // Performance metrics (Bid Manager calculated fields)
