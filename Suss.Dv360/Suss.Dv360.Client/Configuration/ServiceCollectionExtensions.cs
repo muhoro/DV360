@@ -15,9 +15,13 @@ public static class ServiceCollectionExtensions
     /// Registers all DV360 client services, authentication providers, and infrastructure
     /// components into the dependency injection container.
     /// <para>
-    /// Call this method in your host builder’s service configuration to make
+    /// Call this method in your host builder's service configuration to make
     /// <see cref="ICampaignWorkflowService"/> and the individual resource services
     /// (campaigns, creatives, insertion orders, line items) available for injection.
+    /// </para>
+    /// <para>
+    /// Also registers the Phase 2 reporting services including <see cref="IReportingService"/>
+    /// for generating campaign reports via DV360 Bid Manager API.
     /// </para>
     /// </summary>
     /// <param name="services">The service collection to register DV360 services into.</param>
@@ -51,7 +55,10 @@ public static class ServiceCollectionExtensions
                 throw new ArgumentException($"Unsupported auth mode: {options.AuthMode}");
         }
 
-        services.AddHttpClient();
+        // HTTP client for downloading reports from GCS
+        services.AddHttpClient("BidManagerReport");
+
+        // -- Phase 1: Display Video 360 Services --
 
         // The factory is a singleton because it caches the authenticated DisplayVideoService instance.
         services.AddSingleton<IDisplayVideoServiceFactory, DisplayVideoServiceFactory>();
@@ -66,6 +73,23 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITargetingService, TargetingService>();
         services.AddScoped<IGeoRegionService, GeoRegionService>();
         services.AddScoped<ICampaignWorkflowService, CampaignWorkflowService>();
+
+        // -- Phase 2: Bid Manager Reporting Services --
+
+        // Register default polling options
+        services.Configure<ReportPollingOptions>(_ => { });
+
+        // Bid Manager service factory (singleton, cached)
+        services.AddSingleton<IBidManagerServiceFactory, BidManagerServiceFactory>();
+
+        // CSV report parser (singleton, stateless)
+        services.AddSingleton<IReportParser, CsvReportParser>();
+
+        // Polling service (scoped for per-request isolation)
+        services.AddScoped<IReportPollingService, ReportPollingService>();
+
+        // Main reporting service (scoped)
+        services.AddScoped<IReportingService, ReportingService>();
 
         return services;
     }

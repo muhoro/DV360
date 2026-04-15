@@ -1,11 +1,9 @@
 ﻿// =============================================================================
 // Suss.Dv360.Console – Smoke-test harness for the DV360 client library.
 //
-// Demonstrates the full Phase 1 campaign creation workflow:
-//   1. Upload creatives
-//   2. Create campaign
-//   3. Create insertion order + line items
-//   4. Link creatives to line items
+// Usage:
+//   dotnet run                    # Run full campaign creation workflow
+//   dotnet run -- bidmanager      # Test Bid Manager API access with OAuth
 //
 // Configuration is loaded from appsettings.json (auth mode, key paths, advertiser ID).
 // =============================================================================
@@ -16,9 +14,42 @@ using Microsoft.Extensions.Logging;
 using Suss.Dv360.Client.Configuration;
 using Suss.Dv360.Client.Models;
 using Suss.Dv360.Client.Services;
+using Suss.Dv360.Console;
 
 // Build the host with default logging and configuration from appsettings.json.
 var builder = Host.CreateApplicationBuilder(args);
+
+ //Check for subcommand
+//if (args.Length > 0 && args[0].Equals("bidmanager", StringComparison.OrdinalIgnoreCase))
+//{
+//    var config = builder.Configuration.GetSection("Dv360");
+//    var clientId = config["OAuthClientId"] ?? throw new InvalidOperationException("OAuthClientId not configured");
+//    var clientSecret = config["OAuthClientSecret"] ?? throw new InvalidOperationException("OAuthClientSecret not configured");
+//    var advId = long.Parse(config["AdvertiserId"] ?? "0");
+
+//    await BidManagerTest.RunAsync(clientId, clientSecret, advId);
+//    return;
+//}
+
+//if (args.Length > 0 && args[0].Equals("report", StringComparison.OrdinalIgnoreCase))
+//{
+//    builder.Services.AddDv360Client(options =>
+//    {
+//        var config = builder.Configuration.GetSection("Dv360");
+//        options.AuthMode = Enum.Parse<AuthMode>(config["AuthMode"] ?? "OAuthUser");
+//        options.ServiceAccountKeyPath = config["ServiceAccountKeyPath"];
+//        options.OAuthClientId = config["OAuthClientId"];
+//        options.OAuthClientSecret = config["OAuthClientSecret"];
+//        options.TokenStorePath = config["TokenStorePath"] ?? "tokens";
+//    });
+
+//    var reportApp = builder.Build();
+//    var advId = long.Parse(builder.Configuration["Dv360:AdvertiserId"] ?? "0");
+//    long? campaignId = args.Length > 1 ? long.Parse(args[1]) : null;
+
+//    await ReportingDemo.RunAsync(reportApp.Services, advId, campaignId);
+//    return;
+//}
 
 // Register all DV360 client services, binding configuration from the "Dv360" section.
 builder.Services.AddDv360Client(options =>

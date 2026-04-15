@@ -12,13 +12,14 @@ A clean, idiomatic .NET 10 client library that wraps the [Google Display & Video
 4. [Authentication](#authentication)
 5. [Phase 1 Campaign Workflow](#phase-1-campaign-workflow)
 6. [Asset Upload Pipeline](#asset-upload-pipeline)
-7. [Getting Started](#getting-started)
-8. [Configuration Reference](#configuration-reference)
-9. [Dependency Injection Registration](#dependency-injection-registration)
-10. [Engineering Decisions](#engineering-decisions)
-11. [Known Limitations](#known-limitations)
-12. [NuGet Dependencies](#nuget-dependencies)
-13. [License](#license)
+7. [Phase 2 Campaign Reporting](#phase-2-campaign-reporting)
+8. [Getting Started](#getting-started)
+9. [Configuration Reference](#configuration-reference)
+10. [Dependency Injection Registration](#dependency-injection-registration)
+11. [Engineering Decisions](#engineering-decisions)
+12. [Known Limitations](#known-limitations)
+13. [NuGet Dependencies](#nuget-dependencies)
+14. [License](#license)
 
 ---
 
@@ -301,6 +302,99 @@ var creative = new Dv360Creative
 
 ---
 
+## Phase 2 Campaign Reporting
+
+Phase 2 adds campaign reporting capabilities via the **DV360 Bid Manager API v2**, enabling direct reporting on DV360 campaigns without requiring Campaign Manager 360 access.
+
+### Report Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         IReportingService                               │
+│                                                                         │
+│   GetCampaignReportAsync() ─┬─▶ 1. Queries.Create (define query)        │
+│                             ├─▶ 2. Queries.Run (trigger generation)     │
+│                             ├─▶ 3. Queries.Reports.List (poll status)   │
+│                             ├─▶ 4. Download from GCS (get CSV)          │
+│                             └─▶ 5. CsvReportParser (parse to models)    │
+│                                                                         │
+│   Returns: CampaignReportResult with flattened CampaignReportRow[]     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Supported Metrics
+
+| Category | Metrics |
+|---|---|
+| **Delivery** | Impressions, Clicks, Media Cost, Revenue |
+| **Performance** | CTR, CPC, CPM (calculated) |
+| **Conversions** | Total Conversions, CPA, ROAS |
+| **Video** | Video Views, Video Completions, Completion Rate |
+
+### Grouping Dimensions
+
+Reports can be grouped by: **Date**, **Campaign**, **Advertiser**, **InsertionOrder**, **LineItem**, **Creative**, or **Exchange**.
+
+### Usage Example
+
+```csharp
+using var scope = app.Services.CreateScope();
+var reportingService = scope.ServiceProvider.GetRequiredService<IReportingService>();
+
+// Build report request
+var request = new CampaignReportRequest
+{
+    AdvertiserId = advertiserId,     // DV360 advertiser ID
+    CampaignId = campaignId,         // Optional: filter by campaign
+    DateRange = new ReportDateRange
+    {
+        RelativeDateRange = "LAST_30_DAYS"  // Or use StartDate/EndDate
+    },
+    GroupBy = ReportGrouping.Date
+};
+
+// Execute (handles polling internally)
+var result = await reportingService.GetCampaignReportAsync(request);
+
+// Access data
+Console.WriteLine($"Total Impressions: {result.Rows.Sum(r => r.Impressions):N0}");
+Console.WriteLine($"Total Clicks: {result.Rows.Sum(r => r.Clicks):N0}");
+Console.WriteLine($"Total Media Cost: {result.Rows.Sum(r => r.MediaCost):C2}");
+
+foreach (var row in result.Rows)
+{
+    Console.WriteLine($"{row.Date}: {row.Impressions:N0} imps, {row.Clicks:N0} clicks, {row.Ctr:P2} CTR");
+}
+```
+
+### Async Workflow (Advanced)
+
+For long-running reports or custom polling:
+
+```csharp
+// Step 1: Create and run query
+var queryId = await reportingService.CreateAndRunQueryAsync(request);
+
+// Step 2: Poll for completion (do other work while waiting)
+var pollResult = await pollingService.WaitForReportAsync(queryId);
+
+// Step 3: Download when ready
+var result = await reportingService.DownloadReportAsync(
+    pollResult.DownloadUrl, request.GroupBy);
+```
+
+### Report Models
+
+| Model | Purpose |
+|---|---|
+| `CampaignReportRequest` | Input: advertiserId, campaignId, lineItemId, dateRange, groupBy, filters |
+| `CampaignReportResult` | Output: rows, totals, metadata |
+| `CampaignReportRow` | Single row with all metrics as strongly-typed properties |
+| `ReportDateRange` | Relative (LAST_7_DAYS, etc.) or custom date range |
+| `ReportFilters` | Optional campaign, line item, insertion order, creative, exchange filters |
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -511,10 +605,12 @@ The codebase leverages modern C# features for concise, readable code:
 
 | Package | Version | Purpose |
 |---|---|---|
-| `Google.Apis.DisplayVideo.v3` | 1.73.0.4107 | DV360 API SDK (internal only) |
+| `Google.Apis.DisplayVideo.v3` | 1.73.0.4107 | DV360 API SDK (campaign management) |
+| `Google.Apis.DoubleClickBidManager.v2` | 1.73.0.3982 | Bid Manager API SDK (campaign reporting) |
 | `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.5 | DI registration |
 | `Microsoft.Extensions.Logging.Abstractions` | 10.0.5 | `ILogger<T>` |
 | `Microsoft.Extensions.Options` | 10.0.5 | Options pattern |
+| `Microsoft.Extensions.Http` | 10.0.5 | IHttpClientFactory for GCS downloads |
 
 ### Suss.Dv360.Console
 
