@@ -1,7 +1,7 @@
 namespace Suss.Dv360.Client.Models;
 
 /// <summary>
-/// Input model for the Phase 1 campaign creation workflow.
+/// Campaign creation workflow.
 /// <para>
 /// Bundles all the resources needed to execute the full workflow:
 /// upload creatives → create campaign → create insertion order + line items → link creatives.

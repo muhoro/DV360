@@ -1,7 +1,7 @@
 namespace Suss.Dv360.Client.Models;
 
 /// <summary>
-/// Output model returned by the Phase 1 campaign creation workflow after all resources
+/// Campaign creation workflow after all resources
 /// have been successfully created and linked in DV360.
 /// <para>
 /// Every object in this result carries its DV360-assigned identifier, confirming
