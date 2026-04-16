@@ -23,9 +23,15 @@ internal sealed class OAuthUserAuthProvider(
     ILogger<OAuthUserAuthProvider> logger) : IDv360AuthProvider
 {
     /// <summary>
-    /// The OAuth 2.0 scope required to access the Display &amp; Video 360 API.
+    /// OAuth 2.0 scopes required for DV360 operations:
+    /// - display-video: Campaign management (Phase 1)
+    /// - doubleclickbidmanager: Reporting via Bid Manager API (Phase 2)
     /// </summary>
-    private const string DisplayVideoScope = "https://www.googleapis.com/auth/display-video";
+    private static readonly string[] Scopes =
+    [
+        "https://www.googleapis.com/auth/display-video",
+        "https://www.googleapis.com/auth/doubleclickbidmanager"
+    ];
 
     private readonly Dv360ClientOptions _options = options.Value;
 
@@ -53,7 +59,7 @@ internal sealed class OAuthUserAuthProvider(
                 ClientId = _options.OAuthClientId,
                 ClientSecret = _options.OAuthClientSecret
             },
-            [DisplayVideoScope],
+            Scopes,
             "user",
             cancellationToken,
             new FileDataStore(_options.TokenStorePath ?? "tokens"));

@@ -11,7 +11,7 @@ namespace Suss.Dv360.Client.Auth;
 /// <para>
 /// This strategy is ideal for unattended server-to-server scenarios (e.g., backend services,
 /// scheduled jobs) where no interactive user consent is required. The credential is scoped
-/// to the <c>display-video</c> OAuth 2.0 scope.
+/// to both the <c>display-video</c> and <c>doubleclickbidmanager</c> OAuth 2.0 scopes.
 /// </para>
 /// </summary>
 /// <param name="options">Injected client configuration containing the service account key path.</param>
@@ -21,9 +21,15 @@ internal sealed class ServiceAccountAuthProvider(
     ILogger<ServiceAccountAuthProvider> logger) : IDv360AuthProvider
 {
     /// <summary>
-    /// The OAuth 2.0 scope required to access the Display &amp; Video 360 API.
+    /// OAuth 2.0 scopes required for DV360 operations:
+    /// - display-video: Campaign management (Phase 1)
+    /// - doubleclickbidmanager: Reporting via Bid Manager API (Phase 2)
     /// </summary>
-    private const string DisplayVideoScope = "https://www.googleapis.com/auth/display-video";
+    private static readonly string[] Scopes =
+    [
+        "https://www.googleapis.com/auth/display-video",
+        "https://www.googleapis.com/auth/doubleclickbidmanager"
+    ];
 
     private readonly Dv360ClientOptions _options = options.Value;
 
@@ -43,6 +49,6 @@ internal sealed class ServiceAccountAuthProvider(
         await using var stream = new FileStream(_options.ServiceAccountKeyPath, FileMode.Open, FileAccess.Read);
         var credential = await GoogleCredential.FromStreamAsync(stream, cancellationToken);
 
-        return credential.CreateScoped(DisplayVideoScope);
+        return credential.CreateScoped(Scopes);
     }
 }

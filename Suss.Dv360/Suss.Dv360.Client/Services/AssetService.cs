@@ -97,6 +97,22 @@ internal sealed class AssetService(
                 ?? (hasUrl ? GetFilenameFromUrl(asset.Url!) : null)
                 ?? Path.GetFileName(effectiveFilePath);
 
+            // Ensure the filename has an extension matching the MIME type.
+            if (string.IsNullOrEmpty(Path.GetExtension(filename)))
+            {
+                var extension = asset.MimeType.ToLowerInvariant() switch
+                {
+                    "image/png" => ".png",
+                    "image/jpeg" => ".jpg",
+                    "image/gif" => ".gif",
+                    "video/mp4" => ".mp4",
+                    "application/zip" => ".zip",
+                    "application/x-zip-compressed" => ".zip",
+                    _ => string.Empty
+                };
+                filename += extension;
+            }
+
             // The DV360 API requires the filename to be UTF-8 encoded with a maximum size of 240 bytes.
             ValidateFilename(filename);
 
