@@ -33,8 +33,8 @@ var app = builder.Build();
 using var scope = app.Services.CreateScope();
 var workflow = scope.ServiceProvider.GetRequiredService<ITikTokCampaignWorkflowService>();
 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-var promoVideoPath = ResolveAssetPath("promo.mp4", builder.Environment.ContentRootPath);
-var bannerImagePath = ResolveAssetPath("banner_300x250.png", builder.Environment.ContentRootPath);
+var promoVideoUrl = GetRequiredConfiguration(builder.Configuration["TikTok:PromoVideoUrl"], "TikTok:PromoVideoUrl");
+var bannerImageUrl = GetRequiredConfiguration(builder.Configuration["TikTok:BannerImageUrl"], "TikTok:BannerImageUrl");
 var runSuffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
 var scheduleStartTime = DateTime.Now.AddHours(1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
@@ -48,13 +48,13 @@ var request = new TikTokCampaignWorkflowRequest
         new TikTokAsset
         {
             AssetType = TikTokAssetType.Video,
-            FilePath = promoVideoPath,
+            AssetUrl = promoVideoUrl,
             DisplayName = $"Promo Video {runSuffix}"
         },
         new TikTokAsset
         {
             AssetType = TikTokAssetType.Image,
-            FilePath = bannerImagePath,
+            AssetUrl = bannerImageUrl,
             DisplayName = $"Promo Cover {runSuffix}"
         }
     ],
@@ -101,7 +101,7 @@ var request = new TikTokCampaignWorkflowRequest
             CallToAction = "SHOP_NOW",
             LandingPageUrl = "https://example.com",
             OperationStatus = "DISABLE"
-            // VideoId / CoverImageId are wired below from the uploaded assets.
+            // VideoUrl / CoverImageUrl are wired below from campaign-level assets.
         }
     ]
 };
@@ -127,36 +127,10 @@ catch (Exception ex)
     logger.LogError(ex, "Workflow failed");
 }
 
-static string ResolveAssetPath(string fileName, string contentRootPath)
+static string GetRequiredConfiguration(string? value, string key)
 {
-    var searchRoots = new[]
-    {
-        contentRootPath,
-        AppContext.BaseDirectory,
-        Directory.GetCurrentDirectory()
-    }
-    .Where(path => !string.IsNullOrWhiteSpace(path))
-    .Select(Path.GetFullPath)
-    .Distinct(StringComparer.OrdinalIgnoreCase);
-
-    var checkedPaths = new List<string>();
-
-    foreach (var root in searchRoots)
-    {
-        for (var directory = new DirectoryInfo(root);
-             directory is not null;
-             directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "assets", fileName);
-            checkedPaths.Add(candidate);
-
-            if (File.Exists(candidate))
-                return candidate;
-        }
-    }
-
-    throw new FileNotFoundException(
-        $"Could not find sample asset '{fileName}'. Checked: {string.Join(", ", checkedPaths.Distinct(StringComparer.OrdinalIgnoreCase))}",
-        fileName);
+    return !string.IsNullOrWhiteSpace(value)
+        ? value
+        : throw new InvalidOperationException($"Configuration value '{key}' is required.");
 }
 
