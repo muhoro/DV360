@@ -106,17 +106,14 @@ var request = new CampaignWorkflowRequest
     AdvertiserId = advertiserId,
     Campaign = new Dv360Campaign
     {
-        DisplayName = $"Test Campaign {Guid.NewGuid()}",
+        DisplayName = "Test Campaign",
+        EntityStatus = "ENTITY_STATUS_DRAFT",
         GoalType = "CAMPAIGN_GOAL_TYPE_BRAND_AWARENESS",
         PerformanceGoalType = "PERFORMANCE_GOAL_TYPE_CPM",
         PerformanceGoalAmountMicros = 1_000_000,              // $1.00 CPM target
-        BudgetAmountMicros = 1_000_000_000,                  // $1,000.00 total budget
+        BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
         StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
-        EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
-        EntityStatus = "ENTITY_STATUS_PAUSED",
-        BudgetUnit = "BUDGET_UNIT_CURRENCY",BudgetDisplayName = "Total Campaign Budget",
-        PlannedSpendAmountMicros = 1_000_000_000          // $1,000.00 planned spend (optional)
-
+        EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1))
     },
     Creatives =
     [
@@ -149,11 +146,11 @@ var request = new CampaignWorkflowRequest
     InsertionOrder = new Dv360InsertionOrder
     {
         DisplayName = "Test Insertion Order",
-        EntityStatus = "ENTITY_STATUS_DRAFT",
-        BudgetAmountMicros = 1_000_000_000,                  // $1,000.00 total budget
+        EntityStatus = "ENTITY_STATUS_PAUSED",
+        BudgetAmountMicros = 10_000_000_000,                  // $10,000.00 total budget
         StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
         EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
-        PacingPeriod = "PACING_PERIOD_FLIGHT",
+        PacingPeriod = "PACING_PERIOD_DAILY",
         PacingType = "PACING_TYPE_AHEAD",
         DailyMaxMicros = 50_000_000,                         // $50.00 daily cap
         KpiType = "KPI_TYPE_CPM",
@@ -167,11 +164,11 @@ var request = new CampaignWorkflowRequest
             DisplayName = "Test Line Item",
             EntityStatus = "ENTITY_STATUS_DRAFT",
             LineItemType = "LINE_ITEM_TYPE_DISPLAY_DEFAULT",
-            MaxBudgetAmountMicros = 1_000_000_000,            // $5,000.00 max line item budget
+            MaxBudgetAmountMicros = 5_000_000_000,            // $5,000.00 max line item budget
             StartDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1)),
             EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1).AddMonths(1)),
-            PacingPeriod = "PACING_PERIOD_FLIGHT",
-            PacingType = "PACING_TYPE_AHEAD", // PACING_PERIOD_FLIGHT
+            PacingPeriod = "PACING_PERIOD_DAILY",
+            PacingType = "PACING_TYPE_AHEAD",
             DailyMaxMicros = 250_000_000,                     // $250.00 daily cap
             FixedBidAmountMicros = 2_000_000,                 // $2.00 fixed CPM bid
             Targeting = new Dv360LineItemTargeting

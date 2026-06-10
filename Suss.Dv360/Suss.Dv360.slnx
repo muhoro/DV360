@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Suss.Dv360.Client/Suss.Dv360.Client.csproj" />
   <Project Path="Suss.Dv360.Console/Suss.Dv360.Console.csproj" />
-  <Project Path="Suss.Dv360.Api/Suss.Dv360.Api.csproj" />
+  <Project Path="Suss.TikTok.Client/Suss.TikTok.Client.csproj" Id="894d4b60-92e7-4d7c-b237-9aaf69dc908e" />
+  <Project Path="Suss.TikTok.Console/Suss.TikTok.Console.csproj" Id="f9eaa14c-52a8-4c76-b34a-2d2440d66701" />
 </Solution>
