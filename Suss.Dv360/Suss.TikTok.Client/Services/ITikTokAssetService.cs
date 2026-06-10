@@ -18,9 +18,10 @@ public interface ITikTokAssetService
     /// </summary>
     /// <param name="advertiserId">The TikTok advertiser id that will own the asset.</param>
     /// <param name="asset">
-    /// The asset to upload. Requires <see cref="TikTokAsset.AssetType"/> and either
-    /// <see cref="TikTokAsset.FilePath"/> or <see cref="TikTokAsset.Content"/>. On return, the
-    /// matching id field and <see cref="TikTokAsset.PreviewUrl"/> are populated.
+    /// The asset to upload. Requires <see cref="TikTokAsset.AssetType"/> and one of
+    /// <see cref="TikTokAsset.Content"/>, <see cref="TikTokAsset.AssetUrl"/>, or
+    /// <see cref="TikTokAsset.FilePath"/>. On return, the matching id field and
+    /// <see cref="TikTokAsset.PreviewUrl"/> are populated.
     /// </param>
     /// <param name="cancellationToken">Optional cancellation token.</param>
     /// <returns>The same <paramref name="asset"/> instance with server-assigned fields populated.</returns>

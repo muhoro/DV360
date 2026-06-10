@@ -21,8 +21,9 @@ public enum TikTokAssetType
 /// <para>
 /// Mirrors the DV360 "upload then reference" pattern: an asset is uploaded first, then its
 /// server-assigned id (<see cref="ImageId"/> / <see cref="VideoId"/> / <see cref="AudioId"/>) is
-/// referenced by an ad's creative. Set <see cref="FilePath"/> (or <see cref="Content"/>) and
-/// <see cref="AssetType"/> before upload; the id fields are populated afterwards.
+/// referenced by an ad's creative. Set <see cref="AssetUrl"/>, <see cref="FilePath"/>, or
+/// <see cref="Content"/> and <see cref="AssetType"/> before upload; the id fields are populated
+/// afterwards.
 /// </para>
 /// </summary>
 public sealed class TikTokAsset
@@ -30,13 +31,22 @@ public sealed class TikTokAsset
     /// <summary>The kind of media this asset represents. Determines which upload endpoint is used.</summary>
     public required TikTokAssetType AssetType { get; set; }
 
-    /// <summary>Absolute or relative path to the local file to upload. Required unless <see cref="Content"/> is set.</summary>
+    /// <summary>HTTP/HTTPS URL to download and upload. Required unless <see cref="Content"/> or <see cref="FilePath"/> is set.</summary>
+    public string? AssetUrl { get; set; }
+
+    /// <summary>
+    /// Absolute or relative path to the local file to upload. HTTP/HTTPS URLs are also accepted for compatibility.
+    /// Required unless <see cref="AssetUrl"/> or <see cref="Content"/> is set.
+    /// </summary>
     public string? FilePath { get; set; }
 
-    /// <summary>Raw file bytes to upload. If set, used instead of reading <see cref="FilePath"/>.</summary>
+    /// <summary>Raw file bytes to upload. If set, used instead of <see cref="AssetUrl"/> or <see cref="FilePath"/>.</summary>
     public byte[]? Content { get; set; }
 
-    /// <summary>The file name reported to TikTok (e.g., "promo.mp4"). Defaults to the file name of <see cref="FilePath"/>.</summary>
+    /// <summary>
+    /// The file name reported to TikTok (e.g., "promo.mp4"). Defaults to the file name of
+    /// <see cref="FilePath"/> or the final segment of <see cref="AssetUrl"/>.
+    /// </summary>
     public string? FileName { get; set; }
 
     /// <summary>

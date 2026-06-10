@@ -79,6 +79,9 @@ public static class ServiceCollectionExtensions
         // Transport: a typed HttpClient backs the envelope-aware API client.
         services.AddHttpClient<ITikTokApiClient, TikTokApiClient>();
 
+        // Asset uploads may receive campaign-level remote URLs that need to be downloaded first.
+        services.AddHttpClient(nameof(TikTokAssetService));
+
         // Resource services (scoped: cheap, stateless, share the singleton transport).
         services.TryAddScoped<ITikTokAssetService, TikTokAssetService>();
         services.TryAddScoped<ITikTokAudienceService, TikTokAudienceService>();

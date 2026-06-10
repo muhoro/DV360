@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -43,16 +44,13 @@ internal sealed class TikTokAudienceService(
 
         // 2) Upload the hashed identifiers to obtain a reusable file_path token.
         var calcType = MapCalculateType(audience.File.IdType);
-        var uploadBody = new UploadFileBody
-        {
-            AdvertiserId = advertiserId,
-            CalculateType = calcType,
-            FileName = $"{audience.AudienceName}.csv",
-            IdSchema = MapIdSchema(audience.File.IdType),
-            Data = string.Join(",", hashed)
-        };
-
-        var uploadData = await apiClient.PostAsync<UploadFileData>(
+        using var uploadBody = BuildUploadFileContent(
+            advertiserId,
+            calcType,
+            $"{audience.AudienceName}.csv",
+            MapIdSchema(audience.File.IdType),
+            string.Join(Environment.NewLine, hashed));
+        var uploadData = await apiClient.PostMultipartAsync<UploadFileData>(
             "dmp/custom_audience/file/upload/", uploadBody, cancellationToken);
 
         // 3) Create the audience referencing the uploaded file token.
@@ -108,6 +106,32 @@ internal sealed class TikTokAudienceService(
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
+    private static MultipartFormDataContent BuildUploadFileContent(
+        string advertiserId,
+        string calculateType,
+        string fileName,
+        string idSchema,
+        string data)
+    {
+        var bytes = Encoding.UTF8.GetBytes(data);
+        var signature = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
+
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent(advertiserId), "advertiser_id" },
+            { new StringContent(calculateType), "calculate_type" },
+            { new StringContent(fileName), "file_name" },
+            { new StringContent(idSchema), "id_schema" },
+            { new StringContent(signature), "file_signature" }
+        };
+
+        var fileContent = new ByteArrayContent(bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        content.Add(fileContent, "file", fileName);
+
+        return content;
+    }
+
     /// <summary>Maps the identifier type to TikTok's <c>calculate_type</c> value.</summary>
     private static string MapCalculateType(TikTokAudienceIdType idType) => idType switch
     {
@@ -127,15 +151,6 @@ internal sealed class TikTokAudienceService(
     };
 
     // --- Internal payload shapes. ---
-
-    private sealed class UploadFileBody
-    {
-        [JsonPropertyName("advertiser_id")] public required string AdvertiserId { get; set; }
-        [JsonPropertyName("calculate_type")] public required string CalculateType { get; set; }
-        [JsonPropertyName("file_name")] public required string FileName { get; set; }
-        [JsonPropertyName("id_schema")] public required string IdSchema { get; set; }
-        [JsonPropertyName("data")] public required string Data { get; set; }
-    }
 
     private sealed class UploadFileData
     {

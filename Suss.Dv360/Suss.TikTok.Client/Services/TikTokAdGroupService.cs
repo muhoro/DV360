@@ -42,6 +42,7 @@ internal sealed class TikTokAdGroupService(
             Placements = adGroup.Placements,
             BillingEvent = adGroup.BillingEvent,
             OptimizationGoal = adGroup.OptimizationGoal,
+            PromotionType = adGroup.PromotionType,
             BudgetMode = adGroup.BudgetMode,
             Budget = adGroup.Budget,
             BidPrice = adGroup.BidPrice,
@@ -70,6 +71,7 @@ internal sealed class TikTokAdGroupService(
         [JsonPropertyName("placements")] public List<string>? Placements { get; set; }
         [JsonPropertyName("billing_event")] public string? BillingEvent { get; set; }
         [JsonPropertyName("optimization_goal")] public string? OptimizationGoal { get; set; }
+        [JsonPropertyName("promotion_type")] public string? PromotionType { get; set; }
         [JsonPropertyName("budget_mode")] public string? BudgetMode { get; set; }
         [JsonPropertyName("budget")] public double? Budget { get; set; }
         [JsonPropertyName("bid_price")] public double? BidPrice { get; set; }

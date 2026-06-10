@@ -82,20 +82,25 @@ internal sealed class TikTokAdService(
         switch (ad.Format)
         {
             case TikTokAdFormat.SingleVideo:
-                if (string.IsNullOrWhiteSpace(ad.VideoId))
-                    throw new InvalidOperationException($"Ad '{ad.AdName}' is SingleVideo but has no VideoId. Upload a video asset first.");
+                if (string.IsNullOrWhiteSpace(ad.VideoId) && string.IsNullOrWhiteSpace(ad.VideoUrl))
+                    throw new InvalidOperationException($"Ad '{ad.AdName}' is SingleVideo but has no VideoId or VideoUrl.");
                 creative.AdFormat = "SINGLE_VIDEO";
                 creative.VideoId = ad.VideoId;
+                creative.VideoUrl = ad.VideoUrl;
                 // TikTok requires a cover image for video ads.
                 if (!string.IsNullOrWhiteSpace(ad.CoverImageId))
                     creative.ImageIds = [ad.CoverImageId];
+                if (!string.IsNullOrWhiteSpace(ad.CoverImageUrl))
+                    creative.ImageUrls = [ad.CoverImageUrl];
                 break;
 
             case TikTokAdFormat.SingleImage:
-                if (ad.ImageIds is null || ad.ImageIds.Count == 0)
-                    throw new InvalidOperationException($"Ad '{ad.AdName}' is SingleImage but has no ImageIds. Upload image assets first.");
+                if ((ad.ImageIds is null || ad.ImageIds.Count == 0) &&
+                    (ad.ImageUrls is null || ad.ImageUrls.Count == 0))
+                    throw new InvalidOperationException($"Ad '{ad.AdName}' is SingleImage but has no ImageIds or ImageUrls.");
                 creative.AdFormat = "SINGLE_IMAGE";
                 creative.ImageIds = ad.ImageIds;
+                creative.ImageUrls = ad.ImageUrls;
                 break;
 
             case TikTokAdFormat.SparkAd:
@@ -131,7 +136,9 @@ internal sealed class TikTokAdService(
         [JsonPropertyName("call_to_action")] public string? CallToAction { get; set; }
         [JsonPropertyName("landing_page_url")] public string? LandingPageUrl { get; set; }
         [JsonPropertyName("video_id")] public string? VideoId { get; set; }
+        [JsonPropertyName("video_url")] public string? VideoUrl { get; set; }
         [JsonPropertyName("image_ids")] public List<string>? ImageIds { get; set; }
+        [JsonPropertyName("image_urls")] public List<string>? ImageUrls { get; set; }
         [JsonPropertyName("tiktok_item_id")] public string? TikTokItemId { get; set; }
         [JsonPropertyName("identity_id")] public string? IdentityId { get; set; }
         [JsonPropertyName("identity_type")] public string? IdentityType { get; set; }

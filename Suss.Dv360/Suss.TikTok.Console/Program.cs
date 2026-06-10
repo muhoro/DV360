@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using Suss.TikTok.Client.Configuration;
 using Suss.TikTok.Client.Models;
 using Suss.TikTok.Client.Services;
+using System.Globalization;
 
 // Build the host with default logging and configuration from appsettings.json.
 var builder = Host.CreateApplicationBuilder(args);
@@ -32,6 +33,10 @@ var app = builder.Build();
 using var scope = app.Services.CreateScope();
 var workflow = scope.ServiceProvider.GetRequiredService<ITikTokCampaignWorkflowService>();
 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+var promoVideoPath = ResolveAssetPath("promo.mp4", builder.Environment.ContentRootPath);
+var bannerImagePath = ResolveAssetPath("banner_300x250.png", builder.Environment.ContentRootPath);
+var runSuffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+var scheduleStartTime = DateTime.Now.AddHours(1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
 // Build the workflow request with sample data for smoke testing.
 // NOTE: Budgets/bids are in the advertiser account currency (e.g., USD).
@@ -43,49 +48,43 @@ var request = new TikTokCampaignWorkflowRequest
         new TikTokAsset
         {
             AssetType = TikTokAssetType.Video,
-            FilePath = "assets/promo.mp4",
-            DisplayName = "Promo Video"
+            FilePath = promoVideoPath,
+            DisplayName = $"Promo Video {runSuffix}"
         },
         new TikTokAsset
         {
             AssetType = TikTokAssetType.Image,
-            FilePath = "assets/cover.jpg",
-            DisplayName = "Video Cover"
+            FilePath = bannerImagePath,
+            DisplayName = $"Promo Cover {runSuffix}"
         }
     ],
 
     // Customer-match audiences. Raw identifiers are SHA-256 hashed locally before upload.
     Audiences =
     [
-        new TikTokAudience
-        {
-            AudienceName = "VIP Customers",
-            File = new TikTokAudienceFile
-            {
-                IdType = TikTokAudienceIdType.Email,
-                Values = ["alice@example.com", "bob@example.com"]
-            }
-        }
     ],
 
     Campaign = new TikTokCampaign
     {
-        CampaignName = "Test Campaign",
+        CampaignName = $"Test Campaign {runSuffix}",
         ObjectiveType = "TRAFFIC",
-        BudgetMode = "BUDGET_MODE_INFINITE",
+        BudgetMode = "BUDGET_MODE_TOTAL",
+        Budget = 50.0,
         OperationStatus = "DISABLE"             // Create paused so the smoke test never spends.
     },
 
     AdGroup = new TikTokAdGroup
     {
-        AdGroupName = "Test Ad Group",
+        AdGroupName = $"Test Ad Group {runSuffix}",
         PlacementType = "PLACEMENT_TYPE_AUTOMATIC",
         BillingEvent = "CPC",
         OptimizationGoal = "CLICK",
+        PromotionType = "WEBSITE",
         BudgetMode = "BUDGET_MODE_DAY",
         Budget = 50.0,                          // $50.00 daily budget
         BidPrice = 0.50,                        // $0.50 bid
         ScheduleType = "SCHEDULE_FROM_NOW",
+        ScheduleStartTime = scheduleStartTime,
         LocationIds = ["6252001"],              // Example: United States
         OperationStatus = "DISABLE"
     },
@@ -95,7 +94,7 @@ var request = new TikTokCampaignWorkflowRequest
         // A single-video ad referencing the uploaded video + cover image.
         new TikTokAd
         {
-            AdName = "Video Ad",
+            AdName = $"Video Ad {runSuffix}",
             Format = TikTokAdFormat.SingleVideo,
             DisplayName = "My Brand",
             AdText = "Check out our latest collection!",
@@ -110,31 +109,6 @@ var request = new TikTokCampaignWorkflowRequest
 try
 {
     logger.LogInformation("Starting TikTok campaign creation workflow...");
-
-    // Note: in a real run, after uploading assets you would copy the uploaded IDs onto the ads.
-    // For demonstration, the workflow uploads assets first; here we link the first video/image to
-    // the video ad before ads are created. (The workflow uploads before creating ads.)
-    var videoAsset = request.Assets.FirstOrDefault(a => a.AssetType == TikTokAssetType.Video);
-    var coverAsset = request.Assets.FirstOrDefault(a => a.AssetType == TikTokAssetType.Image);
-
-    // The workflow populates asset IDs during execution; wire them via a pre-upload pass so the
-    // ad has its references ready. In production, upload assets explicitly, then build ads.
-    var assetService = scope.ServiceProvider.GetRequiredService<ITikTokAssetService>();
-    var advertiserId = builder.Configuration["TikTok:AdvertiserId"]!;
-
-    if (videoAsset is not null)
-    {
-        await assetService.UploadAsync(advertiserId, videoAsset);
-        request.Ads[0].VideoId = videoAsset.VideoId;
-    }
-    if (coverAsset is not null)
-    {
-        await assetService.UploadAsync(advertiserId, coverAsset);
-        request.Ads[0].CoverImageId = coverAsset.ImageId;
-    }
-
-    // Avoid double-uploading inside the workflow now that we've uploaded above.
-    request.Assets.Clear();
 
     var result = await workflow.ExecuteAsync(request);
 
@@ -151,5 +125,38 @@ try
 catch (Exception ex)
 {
     logger.LogError(ex, "Workflow failed");
+}
+
+static string ResolveAssetPath(string fileName, string contentRootPath)
+{
+    var searchRoots = new[]
+    {
+        contentRootPath,
+        AppContext.BaseDirectory,
+        Directory.GetCurrentDirectory()
+    }
+    .Where(path => !string.IsNullOrWhiteSpace(path))
+    .Select(Path.GetFullPath)
+    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    var checkedPaths = new List<string>();
+
+    foreach (var root in searchRoots)
+    {
+        for (var directory = new DirectoryInfo(root);
+             directory is not null;
+             directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "assets", fileName);
+            checkedPaths.Add(candidate);
+
+            if (File.Exists(candidate))
+                return candidate;
+        }
+    }
+
+    throw new FileNotFoundException(
+        $"Could not find sample asset '{fileName}'. Checked: {string.Join(", ", checkedPaths.Distinct(StringComparer.OrdinalIgnoreCase))}",
+        fileName);
 }
 

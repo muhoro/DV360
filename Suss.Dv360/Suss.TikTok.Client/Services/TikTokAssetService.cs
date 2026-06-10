@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Suss.TikTok.Client.Exceptions;
@@ -22,9 +24,11 @@ namespace Suss.TikTok.Client.Services;
 /// </para>
 /// </summary>
 /// <param name="apiClient">The transport abstraction used to call TikTok.</param>
+/// <param name="httpClientFactory">Creates HTTP clients used to download remote campaign assets.</param>
 /// <param name="logger">Logger for upload diagnostics.</param>
 internal sealed class TikTokAssetService(
     ITikTokApiClient apiClient,
+    IHttpClientFactory httpClientFactory,
     ILogger<TikTokAssetService> logger) : ITikTokAssetService
 {
     /// <inheritdoc />
@@ -33,11 +37,12 @@ internal sealed class TikTokAssetService(
         TikTokAsset asset,
         CancellationToken cancellationToken = default)
     {
-        // Resolve the file bytes from either the in-memory content or the file path.
-        var bytes = await ReadAssetBytesAsync(asset, cancellationToken);
+        // Resolve the file bytes from in-memory content, a remote URL, or a local file path.
+        var source = await ReadAssetSourceAsync(asset, cancellationToken);
+        var bytes = source.Bytes;
         var fileName = asset.FileName
-            ?? (asset.FilePath is not null ? Path.GetFileName(asset.FilePath) : null)
-            ?? throw new InvalidOperationException("A FileName or FilePath is required to upload an asset.");
+            ?? source.FileName
+            ?? throw new InvalidOperationException("A FileName, AssetUrl, FilePath, or Content source name is required to upload an asset.");
 
         // TikTok validates uploads against an MD5 signature of the raw bytes.
         var signature = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
@@ -58,7 +63,7 @@ internal sealed class TikTokAssetService(
     private async Task<TikTokAsset> UploadImageAsync(
         string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
-        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName);
+        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "image_file", "image_signature");
         var data = await apiClient.PostMultipartAsync<ImageUploadData>("file/image/ad/upload/", content, ct);
 
         asset.ImageId = data.ImageId;
@@ -69,11 +74,10 @@ internal sealed class TikTokAssetService(
     private async Task<TikTokAsset> UploadVideoAsync(
         string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
-        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName);
-        // The video endpoint returns a list of uploaded videos.
-        var data = await apiClient.PostMultipartAsync<List<VideoUploadData>>("file/video/ad/upload/", content, ct);
+        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "video_file", "video_signature");
+        var data = await apiClient.PostMultipartAsync<JsonElement>("file/video/ad/upload/", content, ct);
 
-        var first = data.FirstOrDefault()
+        var first = ParseVideoUploadData(data)
             ?? throw new TikTokApiException("Video upload succeeded but returned no video data.");
         asset.VideoId = first.VideoId;
         asset.PreviewUrl = first.PreviewUrl;
@@ -83,7 +87,7 @@ internal sealed class TikTokAssetService(
     private async Task<TikTokAsset> UploadAudioAsync(
         string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
-        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName);
+        using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "audio_file", "audio_signature");
         var data = await apiClient.PostMultipartAsync<AudioUploadData>("file/audio/ad/upload/", content, ct);
 
         asset.AudioId = data.AudioId;
@@ -94,41 +98,102 @@ internal sealed class TikTokAssetService(
     /// Builds the common multipart/form-data payload shared by all upload endpoints.
     /// </summary>
     private static MultipartFormDataContent BuildMultipart(
-        string advertiserId, byte[] bytes, string fileName, string signature, string? displayName)
+        string advertiserId,
+        byte[] bytes,
+        string fileName,
+        string signature,
+        string? displayName,
+        string fileFieldName,
+        string signatureFieldName)
     {
         var content = new MultipartFormDataContent
         {
             { new StringContent(advertiserId), "advertiser_id" },
             // "UPLOAD_BY_FILE" tells TikTok the binary is in this request (vs. by URL/blob id).
             { new StringContent("UPLOAD_BY_FILE"), "upload_type" },
-            { new StringContent(signature), "file_signature" }
+            { new StringContent(signature), signatureFieldName }
         };
 
         if (!string.IsNullOrWhiteSpace(displayName))
             content.Add(new StringContent(displayName), "file_name");
 
         var fileContent = new ByteArrayContent(bytes);
-        content.Add(fileContent, "video_file", fileName);
-        // Images/audio reuse the same binary part under different field names; TikTok accepts the
-        // binary regardless, but we add the canonical field name expected per endpoint where needed.
-        content.Add(new ByteArrayContent(bytes), "image_file", fileName);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        content.Add(fileContent, fileFieldName, fileName);
 
         return content;
     }
 
-    /// <summary>Reads asset bytes from in-memory content or the configured file path.</summary>
-    private static async Task<byte[]> ReadAssetBytesAsync(TikTokAsset asset, CancellationToken ct)
+    /// <summary>Reads asset bytes from in-memory content, a remote URL, or the configured file path.</summary>
+    private async Task<AssetSource> ReadAssetSourceAsync(TikTokAsset asset, CancellationToken ct)
     {
         if (asset.Content is { Length: > 0 })
-            return asset.Content;
+            return new AssetSource(asset.Content, asset.FileName);
+
+        var url = GetAssetUrl(asset);
+        if (url is not null)
+        {
+            var httpClient = httpClientFactory.CreateClient(nameof(TikTokAssetService));
+            var bytes = await httpClient.GetByteArrayAsync(url, ct);
+            return new AssetSource(bytes, GetFileNameFromUrl(url));
+        }
 
         if (string.IsNullOrWhiteSpace(asset.FilePath))
-            throw new InvalidOperationException("Either Content or FilePath must be set to upload an asset.");
+            throw new InvalidOperationException("Content, AssetUrl, or FilePath must be set to upload an asset.");
 
         if (!File.Exists(asset.FilePath))
             throw new InvalidOperationException($"Asset file not found at path '{asset.FilePath}'.");
 
-        return await File.ReadAllBytesAsync(asset.FilePath, ct);
+        return new AssetSource(await File.ReadAllBytesAsync(asset.FilePath, ct), Path.GetFileName(asset.FilePath));
+    }
+
+    private static Uri? GetAssetUrl(TikTokAsset asset)
+    {
+        var candidate = !string.IsNullOrWhiteSpace(asset.AssetUrl)
+            ? asset.AssetUrl
+            : asset.FilePath;
+
+        return Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+               && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? uri
+            : null;
+    }
+
+    private static string? GetFileNameFromUrl(Uri url)
+    {
+        var fileName = Path.GetFileName(url.LocalPath);
+        return string.IsNullOrWhiteSpace(fileName) ? null : fileName;
+    }
+
+    private static VideoUploadData? ParseVideoUploadData(JsonElement data)
+    {
+        return data.ValueKind switch
+        {
+            JsonValueKind.Object => ReadVideoUploadObject(data),
+            JsonValueKind.Array => data.EnumerateArray().Select(ReadVideoUploadObject).FirstOrDefault(video => video is not null),
+            _ => null
+        };
+    }
+
+    private static VideoUploadData? ReadVideoUploadObject(JsonElement data)
+    {
+        var videoId = GetStringProperty(data, "video_id");
+        var previewUrl = GetStringProperty(data, "preview_url");
+
+        if (!string.IsNullOrWhiteSpace(videoId))
+            return new VideoUploadData { VideoId = videoId, PreviewUrl = previewUrl };
+
+        if (data.TryGetProperty("video_info", out var videoInfo) && videoInfo.ValueKind == JsonValueKind.Array)
+            return videoInfo.EnumerateArray().Select(ReadVideoUploadObject).FirstOrDefault(video => video is not null);
+
+        return null;
+    }
+
+    private static string? GetStringProperty(JsonElement data, string propertyName)
+    {
+        return data.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
     }
 
     // --- Internal payload shapes used only for deserializing upload responses. ---
@@ -149,4 +214,6 @@ internal sealed class TikTokAssetService(
     {
         [JsonPropertyName("audio_id")] public string? AudioId { get; set; }
     }
+
+    private sealed record AssetSource(byte[] Bytes, string? FileName);
 }

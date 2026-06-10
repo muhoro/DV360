@@ -1,0 +1,1212 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Suss.TikTok.Client</name>
+    </assembly>
+    <members>
+        <member name="T:Suss.TikTok.Client.Auth.ITikTokAuthProvider">
+            <summary>
+            Abstracts the acquisition of a TikTok Marketing API access token.
+            <para>
+            This is the primary extensibility point for authentication. The library ships with two
+            built-in implementations:
+            <list type="bullet">
+              <item><description><see cref="T:Suss.TikTok.Client.Auth.StaticTokenAuthProvider"/> – returns a pre-issued long-lived token from configuration.</description></item>
+              <item><description><see cref="T:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider"/> – exchanges an OAuth authorization code for an access token.</description></item>
+            </list>
+            Implement this interface to support additional strategies (e.g., refreshing tokens from a
+            secrets vault, or rotating tokens fetched from a custom token service).
+            </para>
+            <para>
+            Unlike SDK-based clients, TikTok auth resolves to a simple bearer string that is attached to
+            every request via the <c>Access-Token</c> header. The token is cached by callers, so this
+            method may perform a network call (token exchange) on first use.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Auth.ITikTokAuthProvider.GetAccessTokenAsync(System.Threading.CancellationToken)">
+            <summary>
+            Obtains a valid TikTok <c>access_token</c> to attach to outgoing API requests.
+            </summary>
+            <param name="cancellationToken">Token to cancel the acquisition (e.g., during shutdown).</param>
+            <returns>The access token string placed in the <c>Access-Token</c> header.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when a token cannot be acquired.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider">
+            <summary>
+            Authentication provider that performs the TikTok OAuth 2.0 authorization-code exchange to mint
+            an access token.
+            <para>
+            Workflow:
+            <list type="number">
+              <item><description>A user authorizes the app in TikTok's consent screen.</description></item>
+              <item><description>TikTok redirects back with a one-time <c>auth_code</c>.</description></item>
+              <item><description>This provider POSTs <c>app_id</c> + <c>secret</c> + <c>auth_code</c> to
+              <c>/open_api/v1.3/oauth2/access_token/</c> and receives a long-lived <c>access_token</c>.</description></item>
+            </list>
+            The resolved token is cached for the lifetime of this provider (registered as a singleton) so
+            the exchange happens at most once. The exchange is guarded by a <see cref="T:System.Threading.SemaphoreSlim"/> to
+            be safe under concurrent first use.
+            </para>
+            </summary>
+            <param name="httpClient">An <see cref="T:System.Net.Http.HttpClient"/> used to call the token endpoint.</param>
+            <param name="options">Client options carrying the app id, secret, and auth code.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider.#ctor(System.Net.Http.HttpClient,Microsoft.Extensions.Options.IOptions{Suss.TikTok.Client.Configuration.TikTokClientOptions})">
+            <summary>
+            Authentication provider that performs the TikTok OAuth 2.0 authorization-code exchange to mint
+            an access token.
+            <para>
+            Workflow:
+            <list type="number">
+              <item><description>A user authorizes the app in TikTok's consent screen.</description></item>
+              <item><description>TikTok redirects back with a one-time <c>auth_code</c>.</description></item>
+              <item><description>This provider POSTs <c>app_id</c> + <c>secret</c> + <c>auth_code</c> to
+              <c>/open_api/v1.3/oauth2/access_token/</c> and receives a long-lived <c>access_token</c>.</description></item>
+            </list>
+            The resolved token is cached for the lifetime of this provider (registered as a singleton) so
+            the exchange happens at most once. The exchange is guarded by a <see cref="T:System.Threading.SemaphoreSlim"/> to
+            be safe under concurrent first use.
+            </para>
+            </summary>
+            <param name="httpClient">An <see cref="T:System.Net.Http.HttpClient"/> used to call the token endpoint.</param>
+            <param name="options">Client options carrying the app id, secret, and auth code.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider.GetAccessTokenAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider.TokenEnvelope">
+            <summary>Minimal envelope used only to parse the token-exchange response.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Auth.OAuthAuthCodeAuthProvider.TokenData">
+            <summary>The <c>data</c> payload of the token-exchange response.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Auth.StaticTokenAuthProvider">
+            <summary>
+            Authentication provider that returns a pre-issued, long-lived TikTok access token supplied
+            directly through <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AccessToken"/>.
+            <para>
+            This is the simplest mode and is appropriate for unattended workloads where a token has already
+            been minted (TikTok access tokens are long-lived and do not auto-expire like Google's). No
+            network call is performed.
+            </para>
+            </summary>
+            <param name="options">Client options carrying the configured access token.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Auth.StaticTokenAuthProvider.#ctor(Microsoft.Extensions.Options.IOptions{Suss.TikTok.Client.Configuration.TikTokClientOptions})">
+            <summary>
+            Authentication provider that returns a pre-issued, long-lived TikTok access token supplied
+            directly through <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AccessToken"/>.
+            <para>
+            This is the simplest mode and is appropriate for unattended workloads where a token has already
+            been minted (TikTok access tokens are long-lived and do not auto-expire like Google's). No
+            network call is performed.
+            </para>
+            </summary>
+            <param name="options">Client options carrying the configured access token.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Auth.StaticTokenAuthProvider.GetAccessTokenAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Suss.TikTok.Client.Configuration.AuthMode">
+            <summary>
+            Specifies the authentication strategy used to obtain a TikTok Marketing API access token.
+            Configured via <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode"/>.
+            <para>
+            Unlike Google's DV360 (which uses service-account or interactive OAuth credentials handled by
+            an SDK), TikTok's Marketing API is a raw REST API secured by a long-lived <c>access_token</c>
+            passed in the <c>Access-Token</c> request header. This enum lets the client either reuse a
+            pre-issued token or perform the OAuth 2.0 authorization-code exchange to mint one.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Configuration.AuthMode.AccessToken">
+            <summary>
+            Use a pre-existing, long-lived <c>access_token</c> supplied directly via
+            <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AccessToken"/>.
+            <para>Best suited for unattended server-to-server workloads where a token has already
+            been minted and stored securely.</para>
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Configuration.AuthMode.OAuthAuthorizationCode">
+            <summary>
+            Exchange an OAuth 2.0 <c>auth_code</c> (obtained after a user authorizes the app in the
+            TikTok consent screen) for an <c>access_token</c> using the app's <c>app_id</c> and
+            <c>secret</c>.
+            <para>Best suited for tools that onboard new advertiser accounts interactively.</para>
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Configuration.ServiceCollectionExtensions">
+            <summary>
+            Dependency-injection registration helpers for the TikTok Marketing API client.
+            <para>
+            A single call to <c>AddTikTokClient(...)</c> wires up options, the auth provider (selected by
+            <see cref="T:Suss.TikTok.Client.Configuration.AuthMode"/>), the HTTP transport, and all resource/workflow services. Consumers then
+            resolve <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService"/> (or any individual service) from DI.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Configuration.ServiceCollectionExtensions.AddTikTokClient(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Action{Suss.TikTok.Client.Configuration.TikTokClientOptions})">
+            <summary>
+            Registers the TikTok client and its dependencies using an options-configuring delegate.
+            </summary>
+            <param name="services">The service collection to add registrations to.</param>
+            <param name="configureOptions">A delegate that populates <see cref="T:Suss.TikTok.Client.Configuration.TikTokClientOptions"/>.</param>
+            <returns>The same <paramref name="services"/> instance for chaining.</returns>
+        </member>
+        <member name="M:Suss.TikTok.Client.Configuration.ServiceCollectionExtensions.AddTikTokClient(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration,System.String)">
+            <summary>
+            Registers the TikTok client binding options from a configuration section
+            (default section name: <see cref="F:Suss.TikTok.Client.Configuration.TikTokClientOptions.SectionName"/>).
+            </summary>
+            <param name="services">The service collection to add registrations to.</param>
+            <param name="configuration">The configuration root/section containing the "TikTok" section.</param>
+            <param name="sectionName">Optional override for the configuration section name.</param>
+            <returns>The same <paramref name="services"/> instance for chaining.</returns>
+        </member>
+        <member name="M:Suss.TikTok.Client.Configuration.ServiceCollectionExtensions.AddTikTokClientCore(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Shared registration logic: auth provider, typed HTTP clients, transport, and services.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Configuration.TikTokClientOptions">
+            <summary>
+            Strongly-typed configuration surface for the TikTok Marketing API client.
+            <para>
+            Bind this from configuration (e.g., <c>appsettings.json</c> section "TikTok") and register it
+            via <c>services.AddTikTokClient(...)</c>. The options drive authentication, the target API
+            host/version, and the default advertiser scope used by the resource services.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Configuration.TikTokClientOptions.SectionName">
+            <summary>The configuration section name conventionally used to bind these options.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode">
+            <summary>
+            The authentication strategy used to obtain an access token.
+            Defaults to <see cref="F:Suss.TikTok.Client.Configuration.AuthMode.AccessToken"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AppId">
+            <summary>
+            The TikTok developer application id (<c>app_id</c>).
+            Required when <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode"/> is <see cref="F:Suss.TikTok.Client.Configuration.AuthMode.OAuthAuthorizationCode"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AppSecret">
+            <summary>
+            The TikTok developer application secret.
+            Required when <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode"/> is <see cref="F:Suss.TikTok.Client.Configuration.AuthMode.OAuthAuthorizationCode"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthCode">
+            <summary>
+            A one-time OAuth authorization code returned to the app's redirect URI after the user
+            grants consent. Exchanged for an <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AccessToken"/> when
+            <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode"/> is <see cref="F:Suss.TikTok.Client.Configuration.AuthMode.OAuthAuthorizationCode"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AccessToken">
+            <summary>
+            A pre-issued long-lived access token. Required when <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AuthMode"/> is
+            <see cref="F:Suss.TikTok.Client.Configuration.AuthMode.AccessToken"/>; ignored otherwise (the token is fetched instead).
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AdvertiserId">
+            <summary>
+            The default TikTok advertiser id under which resources are created/queried. Most Marketing
+            API endpoints require an <c>advertiser_id</c>; services use this value when one is not
+            passed explicitly.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.BaseUrl">
+            <summary>
+            The base URL for the TikTok Marketing API. Override to target the sandbox environment.
+            Defaults to the production host.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.ApiVersion">
+            <summary>
+            The Marketing API version segment used when composing endpoint paths (e.g., <c>v1.3</c>).
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Exceptions.TikTokApiException">
+            <summary>
+            Represents an error returned by the TikTok Marketing API.
+            <para>
+            The TikTok Marketing API is "envelope based": every response returns HTTP 200 with a JSON body
+            shaped as <c>{ "code": 0, "message": "OK", "request_id": "...", "data": { ... } }</c>. A
+            non-zero <see cref="P:Suss.TikTok.Client.Exceptions.TikTokApiException.Code"/> indicates a business/validation failure even though the HTTP status
+            is success. All services in this library translate non-zero envelopes (and transport failures)
+            into a <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/> so consumers never have to parse raw envelopes.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Exceptions.TikTokApiException.Code">
+            <summary>
+            The TikTok business error code from the response envelope (<c>code</c> field).
+            A value of <c>0</c> means success; any other value indicates an error. <c>null</c> when the
+            failure occurred at the transport layer before an envelope could be parsed.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Exceptions.TikTokApiException.RequestId">
+            <summary>
+            The TikTok request identifier (<c>request_id</c>) echoed in every response. Include this when
+            contacting TikTok support to trace a specific call.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Exceptions.TikTokApiException.ResponseBody">
+            <summary>
+            The raw JSON body returned by the API, retained for diagnostics when available.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Exceptions.TikTokApiException.#ctor(System.String)">
+            <summary>
+            Initializes a new <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/> with the specified message.
+            </summary>
+            <param name="message">A human-readable description of the error.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Exceptions.TikTokApiException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/> with the specified message and inner exception.
+            </summary>
+            <param name="message">A human-readable description of the error.</param>
+            <param name="innerException">The underlying exception that caused this failure.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Exceptions.TikTokApiException.#ctor(System.String,System.Nullable{System.Int64},System.String,System.String)">
+            <summary>
+            Initializes a new <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/> from a parsed error envelope.
+            </summary>
+            <param name="message">A human-readable description of the error.</param>
+            <param name="code">The TikTok business error code.</param>
+            <param name="requestId">The TikTok request identifier.</param>
+            <param name="responseBody">The raw JSON response body.</param>
+        </member>
+        <member name="T:Suss.TikTok.Client.Infrastructure.ITikTokApiClient">
+            <summary>
+            Low-level transport abstraction over the TikTok Marketing API.
+            <para>
+            Hides the repetitive concerns of every API call behind a small surface:
+            <list type="bullet">
+              <item><description>Composing the full URL from base host + version + relative path.</description></item>
+              <item><description>Attaching the <c>Access-Token</c> header from the configured auth provider.</description></item>
+              <item><description>Serializing/deserializing JSON and unwrapping the standard envelope.</description></item>
+              <item><description>Translating non-zero envelope codes and transport faults into <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/>.</description></item>
+            </list>
+            All resource services depend on this abstraction rather than on <see cref="T:System.Net.Http.HttpClient"/> directly,
+            which keeps mapping logic in services and transport logic in one place.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.ITikTokApiClient.GetAsync``1(System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Issues a GET request and returns the unwrapped <c>data</c> payload.
+            </summary>
+            <typeparam name="TData">The expected shape of the <c>data</c> payload.</typeparam>
+            <param name="path">Relative endpoint path (e.g., <c>campaign/get/</c>); version is added automatically.</param>
+            <param name="queryParameters">Optional query string parameters.</param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The deserialized <c>data</c> payload.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown on a non-zero envelope code or transport failure.</exception>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.ITikTokApiClient.PostAsync``1(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Issues a POST request with a JSON body and returns the unwrapped <c>data</c> payload.
+            </summary>
+            <typeparam name="TData">The expected shape of the <c>data</c> payload.</typeparam>
+            <param name="path">Relative endpoint path (e.g., <c>campaign/create/</c>); version is added automatically.</param>
+            <param name="body">The request body object; serialized as JSON.</param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The deserialized <c>data</c> payload.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown on a non-zero envelope code or transport failure.</exception>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.ITikTokApiClient.PostMultipartAsync``1(System.String,System.Net.Http.MultipartFormDataContent,System.Threading.CancellationToken)">
+            <summary>
+            Uploads multipart/form-data content (used for image/video/audio asset uploads) and returns the
+            unwrapped <c>data</c> payload.
+            </summary>
+            <typeparam name="TData">The expected shape of the <c>data</c> payload.</typeparam>
+            <param name="path">Relative endpoint path (e.g., <c>file/image/ad/upload/</c>).</param>
+            <param name="content">The pre-built multipart content describing the file and metadata.</param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The deserialized <c>data</c> payload.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown on a non-zero envelope code or transport failure.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Infrastructure.TikTokApiClient">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Infrastructure.ITikTokApiClient"/> implementation backed by <see cref="T:System.Net.Http.HttpClient"/>.
+            <para>
+            This is the single place that knows how to talk HTTP to TikTok. It builds full URLs from the
+            configured host and version, attaches the <c>Access-Token</c> header (resolved lazily from the
+            <see cref="T:Suss.TikTok.Client.Auth.ITikTokAuthProvider"/>), sends/receives JSON, and unwraps the standard envelope —
+            converting non-zero codes into a <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/>. Resource services consume
+            the unwrapped <c>data</c> payloads and never see envelopes or raw HTTP.
+            </para>
+            </summary>
+            <param name="httpClient">The HTTP client (configured with timeouts/handlers by DI).</param>
+            <param name="authProvider">Resolves the access token for the <c>Access-Token</c> header.</param>
+            <param name="options">Client options carrying the base URL and API version.</param>
+            <param name="logger">Logger for request/response diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.#ctor(System.Net.Http.HttpClient,Suss.TikTok.Client.Auth.ITikTokAuthProvider,Microsoft.Extensions.Options.IOptions{Suss.TikTok.Client.Configuration.TikTokClientOptions},Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Infrastructure.TikTokApiClient})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Infrastructure.ITikTokApiClient"/> implementation backed by <see cref="T:System.Net.Http.HttpClient"/>.
+            <para>
+            This is the single place that knows how to talk HTTP to TikTok. It builds full URLs from the
+            configured host and version, attaches the <c>Access-Token</c> header (resolved lazily from the
+            <see cref="T:Suss.TikTok.Client.Auth.ITikTokAuthProvider"/>), sends/receives JSON, and unwraps the standard envelope —
+            converting non-zero codes into a <see cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException"/>. Resource services consume
+            the unwrapped <c>data</c> payloads and never see envelopes or raw HTTP.
+            </para>
+            </summary>
+            <param name="httpClient">The HTTP client (configured with timeouts/handlers by DI).</param>
+            <param name="authProvider">Resolves the access token for the <c>Access-Token</c> header.</param>
+            <param name="options">Client options carrying the base URL and API version.</param>
+            <param name="logger">Logger for request/response diagnostics.</param>
+        </member>
+        <member name="F:Suss.TikTok.Client.Infrastructure.TikTokApiClient.SerializerOptions">
+            <summary>Shared serializer options; property names are mapped via <c>[JsonPropertyName]</c> on models.</summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.GetAsync``1(System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.PostAsync``1(System.String,System.Object,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.PostMultipartAsync``1(System.String,System.Net.Http.MultipartFormDataContent,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.SendAsync``1(System.Net.Http.HttpRequestMessage,System.Threading.CancellationToken)">
+            <summary>
+            Core send routine shared by all verbs: attaches auth, executes the request, and unwraps the envelope.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Infrastructure.TikTokApiClient.BuildUrl(System.String,System.Collections.Generic.IDictionary{System.String,System.String})">
+            <summary>
+            Builds an absolute endpoint URL from the configured base URL, the <c>/open_api/{version}/</c>
+            prefix, the relative path, and any query parameters.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1">
+            <summary>
+            Strongly-typed representation of the standard TikTok Marketing API response envelope.
+            <para>
+            Every Marketing API call returns HTTP 200 with a body shaped as:
+            <code>
+            { "code": 0, "message": "OK", "request_id": "20240101...", "data": { ... } }
+            </code>
+            Success is indicated by <see cref="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.Code"/> == 0 — <b>not</b> by the HTTP status. The infrastructure
+            layer inspects <see cref="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.Code"/> and throws when it is non-zero.
+            </para>
+            </summary>
+            <typeparam name="TData">The shape of the endpoint-specific <c>data</c> payload.</typeparam>
+        </member>
+        <member name="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.Code">
+            <summary>The business status code. <c>0</c> indicates success; any other value is an error.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.Message">
+            <summary>A human-readable status message (e.g., "OK" or a validation error description).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.RequestId">
+            <summary>The TikTok request identifier, useful for support and tracing.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Infrastructure.TikTokApiResponse`1.Data">
+            <summary>The endpoint-specific payload. <c>null</c> for errors or empty responses.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAdFormat">
+            <summary>
+            The creative format of a TikTok ad. Determines which asset ids and fields are required.
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleVideo">
+            <summary>A single-video in-feed ad. Requires a <see cref="P:Suss.TikTok.Client.Models.TikTokAd.VideoId"/> and a cover image.</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleImage">
+            <summary>A single-image ad (e.g., for certain placements). Requires <see cref="P:Suss.TikTok.Client.Models.TikTokAd.ImageIds"/>.</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAdFormat.SparkAd">
+            <summary>
+            A Spark Ad that boosts an existing organic TikTok post. Requires a
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAd.TikTokItemId"/> (and an authorization code from the creator).
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAd">
+            <summary>
+            A flat representation of a TikTok ad (the bottom tier: campaign → ad group → ad).
+            <para>
+            An ad binds creative content (video/image assets or a Spark Ad post) to display text and a
+            destination. The <see cref="P:Suss.TikTok.Client.Models.TikTokAd.Format"/> dictates which asset references are required. Asset ids
+            here come from uploading <see cref="T:Suss.TikTok.Client.Models.TikTokAsset"/> instances first. <see cref="P:Suss.TikTok.Client.Models.TikTokAd.AdId"/> is
+            populated after creation; <see cref="P:Suss.TikTok.Client.Models.TikTokAd.AdGroupId"/> is wired by the workflow.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.AdId">
+            <summary>The server-assigned ad id. <c>null</c> before creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.AdGroupId">
+            <summary>The parent ad group id. Set automatically by the workflow after the ad group is created.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.AdName">
+            <summary>A human-readable ad name (internal; not shown to users).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.Format">
+            <summary>The creative format that determines required asset references.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.DisplayName">
+            <summary>The brand/display name shown on the ad (TikTok <c>display_name</c>).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.AdText">
+            <summary>The ad caption/primary text (TikTok <c>ad_text</c>).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.CallToAction">
+            <summary>The call-to-action label (TikTok <c>call_to_action</c>), e.g., <c>LEARN_MORE</c>, <c>SHOP_NOW</c>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.LandingPageUrl">
+            <summary>The landing page URL the ad clicks through to (TikTok <c>landing_page_url</c>).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.VideoId">
+            <summary>
+            The uploaded video id (from a <see cref="T:Suss.TikTok.Client.Models.TikTokAsset"/> upload). For URL-backed campaign
+            assets, use <see cref="P:Suss.TikTok.Client.Models.TikTokAd.VideoUrl"/> instead.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.VideoUrl">
+            <summary>The remote video URL to pass directly to TikTok ad creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.CoverImageId">
+            <summary>
+            The cover/thumbnail image id used with a video ad (TikTok <c>image_ids</c> first entry for video).
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.CoverImageUrl">
+            <summary>The remote cover image URL to pass directly to TikTok ad creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.ImageIds">
+            <summary>
+            Uploaded image ids (from <see cref="T:Suss.TikTok.Client.Models.TikTokAsset"/> uploads). For URL-backed campaign assets,
+            use <see cref="P:Suss.TikTok.Client.Models.TikTokAd.ImageUrls"/> instead.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.ImageUrls">
+            <summary>Remote image URLs to pass directly to TikTok ad creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.TikTokItemId">
+            <summary>
+            The organic TikTok post id to boost. Required for <see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SparkAd"/>
+            (TikTok <c>tiktok_item_id</c>).
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.IdentityId">
+            <summary>The identity (TikTok <c>identity_id</c>) the ad is published under.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.IdentityType">
+            <summary>The identity type (TikTok <c>identity_type</c>), e.g., <c>CUSTOMIZED_USER</c>, <c>AUTH_CODE</c>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAd.OperationStatus">
+            <summary>Operation status (TikTok <c>operation_status</c>): <c>ENABLE</c> or <c>DISABLE</c>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAdGroup">
+            <summary>
+            A flat representation of a TikTok ad group (the middle tier: campaign → ad group → ad).
+            <para>
+            The ad group carries targeting, budget, schedule, bidding, and placement settings. Only common
+            fields are surfaced here; <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.AdGroupId"/> is populated after creation and
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.CampaignId"/> is wired automatically by the workflow.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.AdGroupId">
+            <summary>The server-assigned ad group id. <c>null</c> before creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.CampaignId">
+            <summary>The parent campaign id. Set automatically by the workflow after the campaign is created.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.AdGroupName">
+            <summary>A human-readable ad group name.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.PlacementType">
+            <summary>
+            Where ads are shown (TikTok <c>placement_type</c>): <c>PLACEMENT_TYPE_AUTOMATIC</c> or
+            <c>PLACEMENT_TYPE_NORMAL</c> (with explicit <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.Placements"/>).
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.Placements">
+            <summary>Explicit placements (e.g., <c>PLACEMENT_TIKTOK</c>) when <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.PlacementType"/> is normal.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.BillingEvent">
+            <summary>The optimization goal/billing event mapping (TikTok <c>billing_event</c>), e.g., <c>CPC</c>, <c>CPM</c>, <c>OCPM</c>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.OptimizationGoal">
+            <summary>The optimization goal (TikTok <c>optimization_goal</c>), e.g., <c>CLICK</c>, <c>CONVERT</c>, <c>REACH</c>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.PromotionType">
+            <summary>The promotion type (TikTok <c>promotion_type</c>), e.g., <c>WEBSITE</c> for traffic campaigns.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.BudgetMode">
+            <summary>The budget mode (TikTok <c>budget_mode</c>): infinite/day/total.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.Budget">
+            <summary>The ad group budget amount; required for day/total budget modes.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.BidPrice">
+            <summary>The bid amount, when a manual bidding strategy is used.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.ScheduleStartTime">
+            <summary>Delivery start time in the TikTok-expected format ("yyyy-MM-dd HH:mm:ss").</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.ScheduleEndTime">
+            <summary>Optional delivery end time in the TikTok-expected format ("yyyy-MM-dd HH:mm:ss").</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.ScheduleType">
+            <summary>Schedule type (TikTok <c>schedule_type</c>): <c>SCHEDULE_FROM_NOW</c> or <c>SCHEDULE_START_END</c>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.LocationIds">
+            <summary>Target location ids (TikTok <c>location_ids</c>) for geo targeting.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.IncludedAudienceIds">
+            <summary>
+            Custom audience ids to include in targeting (TikTok <c>audience_ids</c>). These are the ids
+            returned when creating/uploading an audience — see <see cref="T:Suss.TikTok.Client.Models.TikTokAudience"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.ExcludedAudienceIds">
+            <summary>Custom audience ids to exclude from targeting (TikTok <c>excluded_audience_ids</c>).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAdGroup.OperationStatus">
+            <summary>Operation status (TikTok <c>operation_status</c>): <c>ENABLE</c> or <c>DISABLE</c>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAssetType">
+            <summary>
+            Identifies the kind of media being uploaded to TikTok. Each type uses a different upload endpoint
+            and produces a different server-assigned identifier referenced later by creatives/ads.
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAssetType.Image">
+            <summary>A static image (used for image ads and as video cover/thumbnail).</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAssetType.Video">
+            <summary>A video (used for in-feed video ads and Spark Ads fallbacks).</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAssetType.Audio">
+            <summary>An audio track (used where audio assets are supported).</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAsset">
+            <summary>
+            Represents a single media asset to upload to TikTok and the identifiers returned after upload.
+            <para>
+            Mirrors the DV360 "upload then reference" pattern: an asset is uploaded first, then its
+            server-assigned id (<see cref="P:Suss.TikTok.Client.Models.TikTokAsset.ImageId"/> / <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.VideoId"/> / <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AudioId"/>) is
+            referenced by an ad's creative. Set <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl"/>, <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath"/>, or
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.Content"/> and <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetType"/> before upload; the id fields are populated
+            afterwards.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.AssetType">
+            <summary>The kind of media this asset represents. Determines which upload endpoint is used.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl">
+            <summary>HTTP/HTTPS URL to download and upload. Required unless <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.Content"/> or <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath"/> is set.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath">
+            <summary>
+            Absolute or relative path to the local file to upload. HTTP/HTTPS URLs are also accepted for compatibility.
+            Required unless <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl"/> or <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.Content"/> is set.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.Content">
+            <summary>Raw file bytes to upload. If set, used instead of <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl"/> or <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath"/>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.FileName">
+            <summary>
+            The file name reported to TikTok (e.g., "promo.mp4"). Defaults to the file name of
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath"/> or the final segment of <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.DisplayName">
+            <summary>
+            Optional friendly name used in the TikTok asset library. If omitted, TikTok derives one.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.ImageId">
+            <summary>The server-assigned image id, populated after a successful image upload.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.VideoId">
+            <summary>The server-assigned video id, populated after a successful video upload.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.AudioId">
+            <summary>The server-assigned audio id, populated after a successful audio upload.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAsset.PreviewUrl">
+            <summary>
+            A CDN/preview URL returned by TikTok for the uploaded asset, when provided (videos/images).
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAudienceIdType">
+            <summary>
+            The kind of identifier contained in a customer-match audience file.
+            <para>
+            TikTok hashes these identifiers (SHA-256) to match users while preserving privacy. This client
+            hashes the raw values for you before upload when <see cref="P:Suss.TikTok.Client.Models.TikTokAudienceFile.ValuesArePreHashed"/>
+            is <c>false</c>.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAudienceIdType.Email">
+            <summary>Email addresses (normalized to lowercase, trimmed, then SHA-256 hashed).</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAudienceIdType.PhoneNumber">
+            <summary>Phone numbers in E.164 format (trimmed, then SHA-256 hashed).</summary>
+        </member>
+        <member name="F:Suss.TikTok.Client.Models.TikTokAudienceIdType.MobileAdvertiserId">
+            <summary>Mobile advertising IDs (IDFA/GAID), lowercased then SHA-256 hashed.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAudienceFile">
+            <summary>
+            Represents the raw identifiers used to build (or append to) a TikTok custom audience.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudienceFile.IdType">
+            <summary>The type of identifier the <see cref="P:Suss.TikTok.Client.Models.TikTokAudienceFile.Values"/> contain.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudienceFile.Values">
+            <summary>
+            The raw or pre-hashed identifier values (emails, phone numbers, or mobile advertiser ids).
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudienceFile.ValuesArePreHashed">
+            <summary>
+            When <c>true</c>, <see cref="P:Suss.TikTok.Client.Models.TikTokAudienceFile.Values"/> are already SHA-256 hashed and are uploaded as-is.
+            When <c>false</c> (default), the client normalizes and hashes them before upload.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokAudience">
+            <summary>
+            A flat representation of a TikTok custom audience.
+            <para>
+            Audiences can be created from customer-match files (emails, phone numbers, mobile advertiser ids)
+            and then referenced by ad groups via <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.IncludedAudienceIds"/> /
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.ExcludedAudienceIds"/>. <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceId"/> is populated after
+            creation/upload.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceId">
+            <summary>The server-assigned audience id. <c>null</c> before creation; populated afterwards.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceName">
+            <summary>A human-readable audience name.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokAudience.File">
+            <summary>
+            The customer-match file used to build the audience. When creating an audience from identifiers,
+            this is required.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokCampaign">
+            <summary>
+            A flat, consumer-friendly representation of a TikTok campaign.
+            <para>
+            The TikTok campaign is the top of the delivery hierarchy (campaign → ad group → ad). This model
+            intentionally exposes only the most common fields; the service maps it to/from the API's
+            snake_case payload. <see cref="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignId"/> is populated after creation.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignId">
+            <summary>The server-assigned campaign id. <c>null</c> before creation; populated afterwards.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignName">
+            <summary>A human-readable campaign name (must be unique within the advertiser account).</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.ObjectiveType">
+            <summary>
+            The advertising objective (TikTok <c>objective_type</c>), e.g., <c>REACH</c>, <c>TRAFFIC</c>,
+            <c>VIDEO_VIEWS</c>, <c>CONVERSIONS</c>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.BudgetMode">
+            <summary>
+            The budget mode (TikTok <c>budget_mode</c>): <c>BUDGET_MODE_INFINITE</c>,
+            <c>BUDGET_MODE_DAY</c>, or <c>BUDGET_MODE_TOTAL</c>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.Budget">
+            <summary>
+            The campaign-level budget amount. Required when <see cref="P:Suss.TikTok.Client.Models.TikTokCampaign.BudgetMode"/> is a day/total mode.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaign.OperationStatus">
+            <summary>
+            Operation status to set on creation/update (TikTok <c>operation_status</c>): <c>ENABLE</c> or <c>DISABLE</c>.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest">
+            <summary>
+            Input model for the end-to-end TikTok campaign creation workflow.
+            <para>
+            Bundles every resource needed to execute the full workflow:
+            upload assets → (optionally) create/reference audiences → create campaign → create ad group →
+            create ads. The workflow automatically wires parent identifiers (campaign id → ad group,
+            ad group id → ads) and uploaded asset ids (video/image ids → ads) across steps.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.AdvertiserId">
+            <summary>
+            The TikTok advertiser id under which all resources are created. When <c>null</c>, the
+            advertiser id from <see cref="P:Suss.TikTok.Client.Configuration.TikTokClientOptions.AdvertiserId"/> is used.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Assets">
+            <summary>
+            Assets to upload before ad creation. Each asset's id (<see cref="P:Suss.TikTok.Client.Models.TikTokAsset.VideoId"/> /
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.ImageId"/> / <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AudioId"/>) is populated after upload.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Audiences">
+            <summary>
+            Custom audiences to create from customer-match files. Their <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceId"/>
+            values are populated after creation and can be referenced by <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.AdGroup"/>.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Campaign">
+            <summary>The campaign to create. Its <see cref="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignId"/> is populated after creation.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.AdGroup">
+            <summary>
+            The ad group to create under the campaign. Its <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.CampaignId"/> is set
+            automatically by the workflow.
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Ads">
+            <summary>
+            One or more ads to create under the ad group. Each ad's <see cref="P:Suss.TikTok.Client.Models.TikTokAd.AdGroupId"/> is set
+            automatically by the workflow.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult">
+            <summary>
+            Output model returned by the TikTok campaign creation workflow after all resources have been
+            successfully created and linked.
+            <para>
+            Every object carries its TikTok-assigned identifier, confirming server-side creation. Use these
+            ids for subsequent operations (status updates, reporting, etc.).
+            </para>
+            </summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult.Assets">
+            <summary>All uploaded assets, each with its server-assigned video/image/audio id.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult.Audiences">
+            <summary>All created/referenced audiences, each with its server-assigned <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceId"/>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult.Campaign">
+            <summary>The created campaign with its TikTok-assigned <see cref="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignId"/>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult.AdGroup">
+            <summary>The created ad group with its TikTok-assigned <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.AdGroupId"/>.</summary>
+        </member>
+        <member name="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowResult.Ads">
+            <summary>All created ads, each with its TikTok-assigned <see cref="P:Suss.TikTok.Client.Models.TikTokAd.AdId"/>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokAdGroupService">
+            <summary>
+            Provides ad-group-level operations (the middle tier carrying targeting, budget, and bidding).
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokAdGroupService.CreateAsync(System.String,Suss.TikTok.Client.Models.TikTokAdGroup,System.Threading.CancellationToken)">
+            <summary>
+            Creates an ad group under the specified advertiser and parent campaign.
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id that will own the ad group.</param>
+            <param name="adGroup">
+            The ad group to create. Must have <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.CampaignId"/> set. On return,
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.AdGroupId"/> is populated.
+            </param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The same <paramref name="adGroup"/> with its server-assigned id populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when <see cref="P:Suss.TikTok.Client.Models.TikTokAdGroup.CampaignId"/> is not set.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokAdService">
+            <summary>
+            Provides ad-level operations (the bottom tier binding creative content to an ad group).
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokAdService.CreateAsync(System.String,System.String,System.Collections.Generic.IReadOnlyList{Suss.TikTok.Client.Models.TikTokAd},System.Threading.CancellationToken)">
+            <summary>
+            Creates one or more ads under the specified advertiser and parent ad group.
+            <para>
+            TikTok's <c>ad/create/</c> endpoint accepts a batch of creatives in a single call, so this
+            method creates all <paramref name="ads"/> together and maps the returned ids back onto each.
+            </para>
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id that will own the ads.</param>
+            <param name="adGroupId">The parent ad group id all ads are created under.</param>
+            <param name="ads">
+            The ads to create. Each must carry the asset references required by its
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAd.Format"/>. On return, each ad's <see cref="P:Suss.TikTok.Client.Models.TikTokAd.AdId"/> is populated.
+            </param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The same <paramref name="ads"/> list with server-assigned ids populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when a required asset reference is missing for a format.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokAssetService">
+            <summary>
+            Provides operations for uploading media assets (images, videos, audio) to TikTok.
+            <para>
+            Assets must be uploaded before they can be referenced by an ad. The upload returns a
+            server-assigned id (<see cref="P:Suss.TikTok.Client.Models.TikTokAsset.ImageId"/> / <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.VideoId"/> /
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AudioId"/>) that ads use to bind creative content. This service is
+            consumed by <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService"/> but is also available standalone.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokAssetService.UploadAsync(System.String,Suss.TikTok.Client.Models.TikTokAsset,System.Threading.CancellationToken)">
+            <summary>
+            Uploads a single media asset to TikTok under the specified advertiser.
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id that will own the asset.</param>
+            <param name="asset">
+            The asset to upload. Requires <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetType"/> and one of
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.Content"/>, <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.AssetUrl"/>, or
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.FilePath"/>. On return, the matching id field and
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAsset.PreviewUrl"/> are populated.
+            </param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The same <paramref name="asset"/> instance with server-assigned fields populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when required fields are missing.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokAudienceService">
+            <summary>
+            Provides custom-audience operations: creating customer-match audiences from emails, phone numbers,
+            or mobile advertiser ids, and referencing them by id for ad group targeting.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokAudienceService.CreateFromFileAsync(System.String,Suss.TikTok.Client.Models.TikTokAudience,System.Threading.CancellationToken)">
+            <summary>
+            Creates a custom audience from a customer-match file and returns its server-assigned id.
+            <para>
+            Identifier values are normalized and SHA-256 hashed locally (unless already pre-hashed) before
+            upload, so raw PII never leaves the process unhashed.
+            </para>
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id that will own the audience.</param>
+            <param name="audience">
+            The audience to create. Requires a populated <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.File"/>. On return,
+            <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.AudienceId"/> is populated.
+            </param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The same <paramref name="audience"/> with its server-assigned id populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when <see cref="P:Suss.TikTok.Client.Models.TikTokAudience.File"/> is missing.</exception>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokAudienceService.ListAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists the existing custom audiences for an advertiser, allowing callers to reference an
+            audience by id without re-uploading identifiers.
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id whose audiences are listed.</param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The advertiser's audiences with ids and names populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokCampaignService">
+            <summary>
+            Provides campaign-level operations (the top of the TikTok delivery hierarchy).
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokCampaignService.CreateAsync(System.String,Suss.TikTok.Client.Models.TikTokCampaign,System.Threading.CancellationToken)">
+            <summary>
+            Creates a campaign under the specified advertiser.
+            </summary>
+            <param name="advertiserId">The TikTok advertiser id that will own the campaign.</param>
+            <param name="campaign">
+            The campaign to create. On return, <see cref="P:Suss.TikTok.Client.Models.TikTokCampaign.CampaignId"/> is populated.
+            </param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>The same <paramref name="campaign"/> with its server-assigned id populated.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService">
+            <summary>
+            Orchestrates the full end-to-end TikTok campaign creation workflow, wiring together asset upload,
+            audience creation, and the campaign → ad group → ad hierarchy in the correct order.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService.ExecuteAsync(Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest,System.Threading.CancellationToken)">
+            <summary>
+            Executes the complete workflow:
+            <list type="number">
+              <item><description>Upload all <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Assets"/> (videos/images/audio).</description></item>
+              <item><description>Create all <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Audiences"/> from customer-match files.</description></item>
+              <item><description>Create the <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Campaign"/>.</description></item>
+              <item><description>Create the <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.AdGroup"/> under the campaign (auto-wiring created audience ids).</description></item>
+              <item><description>Create all <see cref="P:Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest.Ads"/> under the ad group.</description></item>
+            </list>
+            Parent ids and uploaded asset ids are propagated automatically between steps.
+            </summary>
+            <param name="request">The bundle of resources to create.</param>
+            <param name="cancellationToken">Optional cancellation token.</param>
+            <returns>A result carrying every created resource with its server-assigned id.</returns>
+            <exception cref="T:Suss.TikTok.Client.Exceptions.TikTokApiException">Thrown when any step fails at the API.</exception>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdGroupService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAdGroupService"/> implementation.
+            <para>
+            Maps the flat <see cref="T:Suss.TikTok.Client.Models.TikTokAdGroup"/> model — including targeting, budget, schedule, bidding,
+            placements, and audience inclusion/exclusion — to TikTok's <c>adgroup/create/</c> request body
+            and maps the returned <c>adgroup_id</c> back onto the model.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAdGroupService.#ctor(Suss.TikTok.Client.Infrastructure.ITikTokApiClient,Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokAdGroupService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAdGroupService"/> implementation.
+            <para>
+            Maps the flat <see cref="T:Suss.TikTok.Client.Models.TikTokAdGroup"/> model — including targeting, budget, schedule, bidding,
+            placements, and audience inclusion/exclusion — to TikTok's <c>adgroup/create/</c> request body
+            and maps the returned <c>adgroup_id</c> back onto the model.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAdGroupService.CreateAsync(System.String,Suss.TikTok.Client.Models.TikTokAdGroup,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdGroupService.CreateAdGroupBody">
+            <summary>The <c>adgroup/create/</c> request body in TikTok's expected snake_case shape.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdGroupService.CreateAdGroupData">
+            <summary>The <c>data</c> payload returned by <c>adgroup/create/</c>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAdService"/> implementation.
+            <para>
+            Maps flat <see cref="T:Suss.TikTok.Client.Models.TikTokAd"/> models to TikTok's <c>ad/create/</c> batch request body. Each
+            ad becomes a "creative" entry; the required fields depend on the ad's
+            <see cref="T:Suss.TikTok.Client.Models.TikTokAdFormat"/>:
+            <list type="bullet">
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleVideo"/> → <c>video_id</c> + cover <c>image_ids</c>.</description></item>
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleImage"/> → one or more <c>image_ids</c>.</description></item>
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SparkAd"/> → <c>tiktok_item_id</c> of the organic post.</description></item>
+            </list>
+            The service validates per-format requirements before sending and maps the returned ad ids back.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAdService.#ctor(Suss.TikTok.Client.Infrastructure.ITikTokApiClient,Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokAdService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAdService"/> implementation.
+            <para>
+            Maps flat <see cref="T:Suss.TikTok.Client.Models.TikTokAd"/> models to TikTok's <c>ad/create/</c> batch request body. Each
+            ad becomes a "creative" entry; the required fields depend on the ad's
+            <see cref="T:Suss.TikTok.Client.Models.TikTokAdFormat"/>:
+            <list type="bullet">
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleVideo"/> → <c>video_id</c> + cover <c>image_ids</c>.</description></item>
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SingleImage"/> → one or more <c>image_ids</c>.</description></item>
+              <item><description><see cref="F:Suss.TikTok.Client.Models.TikTokAdFormat.SparkAd"/> → <c>tiktok_item_id</c> of the organic post.</description></item>
+            </list>
+            The service validates per-format requirements before sending and maps the returned ad ids back.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAdService.CreateAsync(System.String,System.String,System.Collections.Generic.IReadOnlyList{Suss.TikTok.Client.Models.TikTokAd},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAdService.MapToCreative(Suss.TikTok.Client.Models.TikTokAd)">
+            <summary>
+            Validates per-format requirements and maps a single <see cref="T:Suss.TikTok.Client.Models.TikTokAd"/> to a creative entry.
+            </summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdService.CreateAdBody">
+            <summary>The <c>ad/create/</c> request body in TikTok's expected snake_case shape.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdService.AdCreative">
+            <summary>A single creative entry within an <c>ad/create/</c> request.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAdService.CreateAdData">
+            <summary>The <c>data</c> payload returned by <c>ad/create/</c>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAssetService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAssetService"/> implementation.
+            <para>
+            Uploads media via TikTok's multipart file endpoints:
+            <list type="bullet">
+              <item><description>Images → <c>file/image/ad/upload/</c></description></item>
+              <item><description>Videos → <c>file/video/ad/upload/</c></description></item>
+              <item><description>Audio  → <c>file/audio/ad/upload/</c></description></item>
+            </list>
+            TikTok requires a <c>file_signature</c> (an MD5 of the file content) to verify upload integrity;
+            this service computes it automatically. It maps the API's snake_case response back onto the
+            flat <see cref="T:Suss.TikTok.Client.Models.TikTokAsset"/> model.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="httpClientFactory">Creates HTTP clients used to download remote campaign assets.</param>
+            <param name="logger">Logger for upload diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAssetService.#ctor(Suss.TikTok.Client.Infrastructure.ITikTokApiClient,System.Net.Http.IHttpClientFactory,Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokAssetService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAssetService"/> implementation.
+            <para>
+            Uploads media via TikTok's multipart file endpoints:
+            <list type="bullet">
+              <item><description>Images → <c>file/image/ad/upload/</c></description></item>
+              <item><description>Videos → <c>file/video/ad/upload/</c></description></item>
+              <item><description>Audio  → <c>file/audio/ad/upload/</c></description></item>
+            </list>
+            TikTok requires a <c>file_signature</c> (an MD5 of the file content) to verify upload integrity;
+            this service computes it automatically. It maps the API's snake_case response back onto the
+            flat <see cref="T:Suss.TikTok.Client.Models.TikTokAsset"/> model.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="httpClientFactory">Creates HTTP clients used to download remote campaign assets.</param>
+            <param name="logger">Logger for upload diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAssetService.UploadAsync(System.String,Suss.TikTok.Client.Models.TikTokAsset,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAssetService.BuildMultipart(System.String,System.Byte[],System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Builds the common multipart/form-data payload shared by all upload endpoints.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAssetService.ReadAssetSourceAsync(Suss.TikTok.Client.Models.TikTokAsset,System.Threading.CancellationToken)">
+            <summary>Reads asset bytes from in-memory content, a remote URL, or the configured file path.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokAudienceService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAudienceService"/> implementation.
+            <para>
+            Builds customer-match audiences from emails, phone numbers, or mobile advertiser ids. Raw values
+            are normalized (lowercase/trim for emails and MAIDs; trim for phone numbers) and SHA-256 hashed
+            locally before being sent to TikTok's <c>dmp/custom_audience/file/upload/</c> +
+            <c>dmp/custom_audience/create/</c> endpoints. Existing audiences can be listed and referenced by
+            id via <see cref="M:Suss.TikTok.Client.Services.TikTokAudienceService.ListAsync(System.String,System.Threading.CancellationToken)"/>.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.#ctor(Suss.TikTok.Client.Infrastructure.ITikTokApiClient,Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokAudienceService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokAudienceService"/> implementation.
+            <para>
+            Builds customer-match audiences from emails, phone numbers, or mobile advertiser ids. Raw values
+            are normalized (lowercase/trim for emails and MAIDs; trim for phone numbers) and SHA-256 hashed
+            locally before being sent to TikTok's <c>dmp/custom_audience/file/upload/</c> +
+            <c>dmp/custom_audience/create/</c> endpoints. Existing audiences can be listed and referenced by
+            id via <see cref="M:Suss.TikTok.Client.Services.TikTokAudienceService.ListAsync(System.String,System.Threading.CancellationToken)"/>.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.CreateFromFileAsync(System.String,Suss.TikTok.Client.Models.TikTokAudience,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.ListAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.HashIdentifier(System.String,Suss.TikTok.Client.Models.TikTokAudienceIdType)">
+            <summary>
+            Normalizes a raw identifier per its type and returns its lowercase hex SHA-256 hash.
+            </summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.MapCalculateType(Suss.TikTok.Client.Models.TikTokAudienceIdType)">
+            <summary>Maps the identifier type to TikTok's <c>calculate_type</c> value.</summary>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokAudienceService.MapIdSchema(Suss.TikTok.Client.Models.TikTokAudienceIdType)">
+            <summary>Maps the identifier type to TikTok's <c>id_schema</c> hint.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokCampaignService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignService"/> implementation.
+            <para>
+            Maps the flat <see cref="T:Suss.TikTok.Client.Models.TikTokCampaign"/> model to TikTok's snake_case <c>campaign/create/</c>
+            request body and maps the returned <c>campaign_id</c> back onto the model. Transport, auth, and
+            envelope handling are delegated to <see cref="T:Suss.TikTok.Client.Infrastructure.ITikTokApiClient"/>.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokCampaignService.#ctor(Suss.TikTok.Client.Infrastructure.ITikTokApiClient,Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokCampaignService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignService"/> implementation.
+            <para>
+            Maps the flat <see cref="T:Suss.TikTok.Client.Models.TikTokCampaign"/> model to TikTok's snake_case <c>campaign/create/</c>
+            request body and maps the returned <c>campaign_id</c> back onto the model. Transport, auth, and
+            envelope handling are delegated to <see cref="T:Suss.TikTok.Client.Infrastructure.ITikTokApiClient"/>.
+            </para>
+            </summary>
+            <param name="apiClient">The transport abstraction used to call TikTok.</param>
+            <param name="logger">Logger for diagnostics.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokCampaignService.CreateAsync(System.String,Suss.TikTok.Client.Models.TikTokCampaign,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokCampaignService.CreateCampaignBody">
+            <summary>The <c>campaign/create/</c> request body in TikTok's expected snake_case shape.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokCampaignService.CreateCampaignData">
+            <summary>The <c>data</c> payload returned by <c>campaign/create/</c>.</summary>
+        </member>
+        <member name="T:Suss.TikTok.Client.Services.TikTokCampaignWorkflowService">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService"/> implementation.
+            <para>
+            Coordinates the resource services in dependency order so consumers can create a fully linked
+            campaign with a single call. Mirrors the DV360 workflow pattern: each step's output (ids) feeds
+            the next step's input. The advertiser id is taken from the request when present, otherwise from
+            configured options.
+            </para>
+            </summary>
+            <param name="assetService">Uploads media assets in step 1.</param>
+            <param name="audienceService">Creates custom audiences in step 2.</param>
+            <param name="campaignService">Creates the campaign in step 3.</param>
+            <param name="adGroupService">Creates the ad group in step 4.</param>
+            <param name="adService">Creates the ads in step 5.</param>
+            <param name="options">Client options providing the default advertiser id.</param>
+            <param name="logger">Logger for workflow progress.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokCampaignWorkflowService.#ctor(Suss.TikTok.Client.Services.ITikTokAssetService,Suss.TikTok.Client.Services.ITikTokAudienceService,Suss.TikTok.Client.Services.ITikTokCampaignService,Suss.TikTok.Client.Services.ITikTokAdGroupService,Suss.TikTok.Client.Services.ITikTokAdService,Microsoft.Extensions.Options.IOptions{Suss.TikTok.Client.Configuration.TikTokClientOptions},Microsoft.Extensions.Logging.ILogger{Suss.TikTok.Client.Services.TikTokCampaignWorkflowService})">
+            <summary>
+            Default <see cref="T:Suss.TikTok.Client.Services.ITikTokCampaignWorkflowService"/> implementation.
+            <para>
+            Coordinates the resource services in dependency order so consumers can create a fully linked
+            campaign with a single call. Mirrors the DV360 workflow pattern: each step's output (ids) feeds
+            the next step's input. The advertiser id is taken from the request when present, otherwise from
+            configured options.
+            </para>
+            </summary>
+            <param name="assetService">Uploads media assets in step 1.</param>
+            <param name="audienceService">Creates custom audiences in step 2.</param>
+            <param name="campaignService">Creates the campaign in step 3.</param>
+            <param name="adGroupService">Creates the ad group in step 4.</param>
+            <param name="adService">Creates the ads in step 5.</param>
+            <param name="options">Client options providing the default advertiser id.</param>
+            <param name="logger">Logger for workflow progress.</param>
+        </member>
+        <member name="M:Suss.TikTok.Client.Services.TikTokCampaignWorkflowService.ExecuteAsync(Suss.TikTok.Client.Models.TikTokCampaignWorkflowRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+    </members>
+</doc>

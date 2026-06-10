@@ -54,21 +54,30 @@ public sealed class TikTokAd
     public string? LandingPageUrl { get; set; }
 
     /// <summary>
-    /// The uploaded video id (from a <see cref="TikTokAsset"/> upload). Required for
-    /// <see cref="TikTokAdFormat.SingleVideo"/>.
+    /// The uploaded video id (from a <see cref="TikTokAsset"/> upload). For URL-backed campaign
+    /// assets, use <see cref="VideoUrl"/> instead.
     /// </summary>
     public string? VideoId { get; set; }
+
+    /// <summary>The remote video URL to pass directly to TikTok ad creation.</summary>
+    public string? VideoUrl { get; set; }
 
     /// <summary>
     /// The cover/thumbnail image id used with a video ad (TikTok <c>image_ids</c> first entry for video).
     /// </summary>
     public string? CoverImageId { get; set; }
 
+    /// <summary>The remote cover image URL to pass directly to TikTok ad creation.</summary>
+    public string? CoverImageUrl { get; set; }
+
     /// <summary>
-    /// Uploaded image ids (from <see cref="TikTokAsset"/> uploads). Required for
-    /// <see cref="TikTokAdFormat.SingleImage"/>.
+    /// Uploaded image ids (from <see cref="TikTokAsset"/> uploads). For URL-backed campaign assets,
+    /// use <see cref="ImageUrls"/> instead.
     /// </summary>
     public List<string>? ImageIds { get; set; }
+
+    /// <summary>Remote image URLs to pass directly to TikTok ad creation.</summary>
+    public List<string>? ImageUrls { get; set; }
 
     /// <summary>
     /// The organic TikTok post id to boost. Required for <see cref="TikTokAdFormat.SparkAd"/>

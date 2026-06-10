@@ -34,6 +34,9 @@ public sealed class TikTokAdGroup
     /// <summary>The optimization goal (TikTok <c>optimization_goal</c>), e.g., <c>CLICK</c>, <c>CONVERT</c>, <c>REACH</c>.</summary>
     public string OptimizationGoal { get; set; } = "CLICK";
 
+    /// <summary>The promotion type (TikTok <c>promotion_type</c>), e.g., <c>WEBSITE</c> for traffic campaigns.</summary>
+    public string? PromotionType { get; set; }
+
     /// <summary>The budget mode (TikTok <c>budget_mode</c>): infinite/day/total.</summary>
     public string BudgetMode { get; set; } = "BUDGET_MODE_DAY";
 

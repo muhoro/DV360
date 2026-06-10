@@ -26,7 +26,7 @@ public sealed class TikTokCampaign
     /// The budget mode (TikTok <c>budget_mode</c>): <c>BUDGET_MODE_INFINITE</c>,
     /// <c>BUDGET_MODE_DAY</c>, or <c>BUDGET_MODE_TOTAL</c>.
     /// </summary>
-    public string BudgetMode { get; set; } = "BUDGET_MODE_INFINITE";
+    public string BudgetMode { get; set; } = "BUDGET_MODE_DAY";
 
     /// <summary>
     /// The campaign-level budget amount. Required when <see cref="BudgetMode"/> is a day/total mode.
