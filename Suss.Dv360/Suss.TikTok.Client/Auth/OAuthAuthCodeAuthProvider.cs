@@ -1,6 +1,3 @@
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using Suss.TikTok.Client.Configuration;
 using Suss.TikTok.Client.Exceptions;
@@ -23,10 +20,10 @@ namespace Suss.TikTok.Client.Auth;
 /// be safe under concurrent first use.
 /// </para>
 /// </summary>
-/// <param name="httpClient">An <see cref="HttpClient"/> used to call the token endpoint.</param>
+/// <param name="oauthService">The OAuth service used to exchange the configured auth code.</param>
 /// <param name="options">Client options carrying the app id, secret, and auth code.</param>
 internal sealed class OAuthAuthCodeAuthProvider(
-    HttpClient httpClient,
+    ITikTokOAuthService oauthService,
     IOptions<TikTokClientOptions> options) : ITikTokAuthProvider
 {
     private readonly TikTokClientOptions _options = options.Value;
@@ -58,48 +55,8 @@ internal sealed class OAuthAuthCodeAuthProvider(
                     $"'{nameof(TikTokClientOptions.AuthCode)}' was not configured.");
             }
 
-            // The token endpoint is unauthenticated (no Access-Token header) and takes the app
-            // credentials in the JSON body.
-            var endpoint = $"{_options.BaseUrl.TrimEnd('/')}/open_api/{_options.ApiVersion}/oauth2/access_token/";
-            var payload = new
-            {
-                app_id = _options.AppId,
-                secret = _options.AppSecret,
-                auth_code = _options.AuthCode,
-                grant_type = "authorization_code"
-            };
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await httpClient.PostAsJsonAsync(endpoint, payload, cancellationToken);
-            }
-            catch (Exception ex) when (ex is not TikTokApiException)
-            {
-                throw new TikTokApiException("Failed to reach the TikTok OAuth token endpoint.", ex);
-            }
-
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            // TikTok returns the access token inside the standard envelope's "data" object.
-            TokenEnvelope? envelope;
-            try
-            {
-                envelope = JsonSerializer.Deserialize<TokenEnvelope>(body);
-            }
-            catch (JsonException ex)
-            {
-                throw new TikTokApiException("Could not parse the TikTok OAuth token response.", ex);
-            }
-
-            if (envelope is null || envelope.Code != 0 || envelope.Data?.AccessToken is null)
-            {
-                throw new TikTokApiException(
-                    $"TikTok OAuth token exchange failed: {envelope?.Message ?? "unknown error"}.",
-                    envelope?.Code, envelope?.RequestId, body);
-            }
-
-            _cachedToken = envelope.Data.AccessToken;
+            var token = await oauthService.ExchangeAuthorizationCodeAsync(_options.AuthCode, cancellationToken);
+            _cachedToken = token.AccessToken;
             return _cachedToken;
         }
         finally
@@ -108,18 +65,4 @@ internal sealed class OAuthAuthCodeAuthProvider(
         }
     }
 
-    /// <summary>Minimal envelope used only to parse the token-exchange response.</summary>
-    private sealed class TokenEnvelope
-    {
-        [JsonPropertyName("code")] public long Code { get; set; }
-        [JsonPropertyName("message")] public string? Message { get; set; }
-        [JsonPropertyName("request_id")] public string? RequestId { get; set; }
-        [JsonPropertyName("data")] public TokenData? Data { get; set; }
-    }
-
-    /// <summary>The <c>data</c> payload of the token-exchange response.</summary>
-    private sealed class TokenData
-    {
-        [JsonPropertyName("access_token")] public string? AccessToken { get; set; }
-    }
 }

@@ -67,14 +67,13 @@ public static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<TikTokClientOptions>>().Value;
             return options.AuthMode switch
             {
-                AuthMode.OAuthAuthorizationCode => ActivatorUtilities.CreateInstance<OAuthAuthCodeAuthProvider>(
-                    sp, sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OAuthAuthCodeAuthProvider))),
+                AuthMode.OAuthAuthorizationCode => ActivatorUtilities.CreateInstance<OAuthAuthCodeAuthProvider>(sp),
                 _ => ActivatorUtilities.CreateInstance<StaticTokenAuthProvider>(sp)
             };
         });
 
         // The OAuth provider needs its own HttpClient (no Access-Token header).
-        services.AddHttpClient(nameof(OAuthAuthCodeAuthProvider));
+        services.AddHttpClient<ITikTokOAuthService, TikTokOAuthService>();
 
         // Transport: a typed HttpClient backs the envelope-aware API client.
         services.AddHttpClient<ITikTokApiClient, TikTokApiClient>();

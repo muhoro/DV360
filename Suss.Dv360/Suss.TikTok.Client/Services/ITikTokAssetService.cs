@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -28,4 +29,12 @@ public interface ITikTokAssetService
     /// <exception cref="Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
     /// <exception cref="InvalidOperationException">Thrown when required fields are missing.</exception>
     Task<TikTokAsset> UploadAsync(string advertiserId, TikTokAsset asset, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads a single media asset using the supplied TikTok execution context.
+    /// </summary>
+    Task<TikTokAsset> UploadAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAsset asset,
+        CancellationToken cancellationToken = default);
 }

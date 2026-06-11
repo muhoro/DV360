@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
 
@@ -15,7 +16,7 @@ namespace Suss.TikTok.Client.Services;
 /// are normalized (lowercase/trim for emails and MAIDs; trim for phone numbers) and SHA-256 hashed
 /// locally before being sent to TikTok's <c>dmp/custom_audience/file/upload/</c> +
 /// <c>dmp/custom_audience/create/</c> endpoints. Existing audiences can be listed and referenced by
-/// id via <see cref="ListAsync"/>.
+/// id via the list methods.
 /// </para>
 /// </summary>
 /// <param name="apiClient">The transport abstraction used to call TikTok.</param>
@@ -29,6 +30,20 @@ internal sealed class TikTokAudienceService(
         string advertiserId,
         TikTokAudience audience,
         CancellationToken cancellationToken = default)
+        => await CreateFromFileAsync(null, advertiserId, audience, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<TikTokAudience> CreateFromFileAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAudience audience,
+        CancellationToken cancellationToken = default)
+        => await CreateFromFileAsync(executionContext, executionContext.AdvertiserId, audience, cancellationToken);
+
+    private async Task<TikTokAudience> CreateFromFileAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        TikTokAudience audience,
+        CancellationToken cancellationToken)
     {
         if (audience.File is null || audience.File.Values.Count == 0)
             throw new InvalidOperationException("TikTokAudience.File with at least one value is required.");
@@ -50,8 +65,11 @@ internal sealed class TikTokAudienceService(
             $"{audience.AudienceName}.csv",
             MapIdSchema(audience.File.IdType),
             string.Join(Environment.NewLine, hashed));
-        var uploadData = await apiClient.PostMultipartAsync<UploadFileData>(
-            "dmp/custom_audience/file/upload/", uploadBody, cancellationToken);
+        var uploadData = executionContext is null
+            ? await apiClient.PostMultipartAsync<UploadFileData>(
+                "dmp/custom_audience/file/upload/", uploadBody, cancellationToken)
+            : await apiClient.PostMultipartAsync<UploadFileData>(
+                executionContext, "dmp/custom_audience/file/upload/", uploadBody, cancellationToken);
 
         // 3) Create the audience referencing the uploaded file token.
         var createBody = new CreateAudienceBody
@@ -62,8 +80,11 @@ internal sealed class TikTokAudienceService(
             CalculateType = calcType
         };
 
-        var createData = await apiClient.PostAsync<CreateAudienceData>(
-            "dmp/custom_audience/create/", createBody, cancellationToken);
+        var createData = executionContext is null
+            ? await apiClient.PostAsync<CreateAudienceData>(
+                "dmp/custom_audience/create/", createBody, cancellationToken)
+            : await apiClient.PostAsync<CreateAudienceData>(
+                executionContext, "dmp/custom_audience/create/", createBody, cancellationToken);
 
         audience.AudienceId = createData.CustomAudienceId;
         return audience;
@@ -73,10 +94,25 @@ internal sealed class TikTokAudienceService(
     public async Task<IReadOnlyList<TikTokAudience>> ListAsync(
         string advertiserId,
         CancellationToken cancellationToken = default)
+        => await ListAsync(null, advertiserId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TikTokAudience>> ListAsync(
+        TikTokExecutionContext executionContext,
+        CancellationToken cancellationToken = default)
+        => await ListAsync(executionContext, executionContext.AdvertiserId, cancellationToken);
+
+    private async Task<IReadOnlyList<TikTokAudience>> ListAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        CancellationToken cancellationToken)
     {
         var query = new Dictionary<string, string?> { ["advertiser_id"] = advertiserId };
-        var data = await apiClient.GetAsync<ListAudienceData>(
-            "dmp/custom_audience/list/", query, cancellationToken);
+        var data = executionContext is null
+            ? await apiClient.GetAsync<ListAudienceData>(
+                "dmp/custom_audience/list/", query, cancellationToken)
+            : await apiClient.GetAsync<ListAudienceData>(
+                executionContext, "dmp/custom_audience/list/", query, cancellationToken);
 
         return (data.List ?? [])
             .Select(a => new TikTokAudience

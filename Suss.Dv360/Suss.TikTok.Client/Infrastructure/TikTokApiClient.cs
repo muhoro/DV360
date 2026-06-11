@@ -45,7 +45,20 @@ internal sealed class TikTokApiClient(
     {
         var url = BuildUrl(path, queryParameters);
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        return await SendAsync<TData>(request, cancellationToken);
+        return await SendAsync<TData>(request, accessToken: null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<TData> GetAsync<TData>(
+        TikTokExecutionContext executionContext,
+        string path,
+        IDictionary<string, string?>? queryParameters = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureExecutionContext(executionContext);
+        var url = BuildUrl(path, queryParameters);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        return await SendAsync<TData>(request, executionContext.AccessToken, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -59,7 +72,23 @@ internal sealed class TikTokApiClient(
         {
             Content = JsonContent.Create(body, options: SerializerOptions)
         };
-        return await SendAsync<TData>(request, cancellationToken);
+        return await SendAsync<TData>(request, accessToken: null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<TData> PostAsync<TData>(
+        TikTokExecutionContext executionContext,
+        string path,
+        object body,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureExecutionContext(executionContext);
+        var url = BuildUrl(path, null);
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body, options: SerializerOptions)
+        };
+        return await SendAsync<TData>(request, executionContext.AccessToken, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -70,17 +99,36 @@ internal sealed class TikTokApiClient(
     {
         var url = BuildUrl(path, null);
         using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-        return await SendAsync<TData>(request, cancellationToken);
+        return await SendAsync<TData>(request, accessToken: null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<TData> PostMultipartAsync<TData>(
+        TikTokExecutionContext executionContext,
+        string path,
+        MultipartFormDataContent content,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureExecutionContext(executionContext);
+        var url = BuildUrl(path, null);
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        return await SendAsync<TData>(request, executionContext.AccessToken, cancellationToken);
     }
 
     /// <summary>
     /// Core send routine shared by all verbs: attaches auth, executes the request, and unwraps the envelope.
     /// </summary>
-    private async Task<TData> SendAsync<TData>(HttpRequestMessage request, CancellationToken cancellationToken)
+    private async Task<TData> SendAsync<TData>(
+        HttpRequestMessage request,
+        string? accessToken,
+        CancellationToken cancellationToken)
     {
-        // Resolve and attach the access token. TikTok uses a custom "Access-Token" header rather
-        // than a standard Authorization bearer header.
-        var token = await authProvider.GetAccessTokenAsync(cancellationToken);
+        // TikTok uses a custom "Access-Token" header. Context-based calls pass the already
+        // resolved token; legacy calls resolve through the configured auth provider.
+        var token = accessToken ?? await authProvider.GetAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new TikTokApiException("TikTok API call cannot be sent because the access token is missing.");
+
         request.Headers.Remove("Access-Token");
         request.Headers.Add("Access-Token", token);
 
@@ -163,5 +211,17 @@ internal sealed class TikTokApiClient(
         }
 
         return url;
+    }
+
+    private static void EnsureExecutionContext(TikTokExecutionContext executionContext)
+    {
+        if (executionContext is null)
+            throw new TikTokApiException("A TikTok execution context is required for this API call.");
+
+        if (string.IsNullOrWhiteSpace(executionContext.AccessToken))
+            throw new TikTokApiException("The TikTok execution context is missing an access token.");
+
+        if (string.IsNullOrWhiteSpace(executionContext.AdvertiserId))
+            throw new TikTokApiException("The TikTok execution context is missing an advertiser id.");
     }
 }

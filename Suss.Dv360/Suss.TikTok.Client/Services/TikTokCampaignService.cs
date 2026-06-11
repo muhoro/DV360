@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
 
@@ -24,6 +25,20 @@ internal sealed class TikTokCampaignService(
         string advertiserId,
         TikTokCampaign campaign,
         CancellationToken cancellationToken = default)
+        => await CreateAsync(null, advertiserId, campaign, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<TikTokCampaign> CreateAsync(
+        TikTokExecutionContext executionContext,
+        TikTokCampaign campaign,
+        CancellationToken cancellationToken = default)
+        => await CreateAsync(executionContext, executionContext.AdvertiserId, campaign, cancellationToken);
+
+    private async Task<TikTokCampaign> CreateAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        TikTokCampaign campaign,
+        CancellationToken cancellationToken)
     {
         logger.LogInformation(
             "Creating campaign '{CampaignName}' (objective {Objective}) for advertiser {AdvertiserId}.",
@@ -40,7 +55,9 @@ internal sealed class TikTokCampaignService(
             OperationStatus = campaign.OperationStatus
         };
 
-        var data = await apiClient.PostAsync<CreateCampaignData>("campaign/create/", body, cancellationToken);
+        var data = executionContext is null
+            ? await apiClient.PostAsync<CreateCampaignData>("campaign/create/", body, cancellationToken)
+            : await apiClient.PostAsync<CreateCampaignData>(executionContext, "campaign/create/", body, cancellationToken);
 
         // Map response -> model.
         campaign.CampaignId = data.CampaignId;

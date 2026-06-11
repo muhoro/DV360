@@ -1,5 +1,7 @@
 namespace Suss.TikTok.Client.Infrastructure;
 
+using Suss.TikTok.Client.Auth;
+
 /// <summary>
 /// Low-level transport abstraction over the TikTok Marketing API.
 /// <para>
@@ -31,6 +33,15 @@ public interface ITikTokApiClient
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Issues a GET request using an already resolved TikTok execution context.
+    /// </summary>
+    Task<TData> GetAsync<TData>(
+        TikTokExecutionContext executionContext,
+        string path,
+        IDictionary<string, string?>? queryParameters = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Issues a POST request with a JSON body and returns the unwrapped <c>data</c> payload.
     /// </summary>
     /// <typeparam name="TData">The expected shape of the <c>data</c> payload.</typeparam>
@@ -40,6 +51,15 @@ public interface ITikTokApiClient
     /// <returns>The deserialized <c>data</c> payload.</returns>
     /// <exception cref="Exceptions.TikTokApiException">Thrown on a non-zero envelope code or transport failure.</exception>
     Task<TData> PostAsync<TData>(
+        string path,
+        object body,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Issues a POST request using an already resolved TikTok execution context.
+    /// </summary>
+    Task<TData> PostAsync<TData>(
+        TikTokExecutionContext executionContext,
         string path,
         object body,
         CancellationToken cancellationToken = default);
@@ -55,6 +75,15 @@ public interface ITikTokApiClient
     /// <returns>The deserialized <c>data</c> payload.</returns>
     /// <exception cref="Exceptions.TikTokApiException">Thrown on a non-zero envelope code or transport failure.</exception>
     Task<TData> PostMultipartAsync<TData>(
+        string path,
+        MultipartFormDataContent content,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads multipart/form-data content using an already resolved TikTok execution context.
+    /// </summary>
+    Task<TData> PostMultipartAsync<TData>(
+        TikTokExecutionContext executionContext,
         string path,
         MultipartFormDataContent content,
         CancellationToken cancellationToken = default);

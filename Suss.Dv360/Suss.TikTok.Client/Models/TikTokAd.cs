@@ -1,5 +1,7 @@
 namespace Suss.TikTok.Client.Models;
 
+using Suss.TikTok.Client.Auth;
+
 /// <summary>
 /// The creative format of a TikTok ad. Determines which asset ids and fields are required.
 /// </summary>
@@ -90,6 +92,13 @@ public sealed class TikTokAd
 
     /// <summary>The identity type (TikTok <c>identity_type</c>), e.g., <c>CUSTOMIZED_USER</c>, <c>AUTH_CODE</c>.</summary>
     public string? IdentityType { get; set; }
+
+    /// <summary>
+    /// Optional Spark authorization captured from a client's TikTok social account/post. When set,
+    /// this supplies <see cref="TikTokItemId"/>, <see cref="IdentityId"/>, and
+    /// <see cref="IdentityType"/> for <see cref="TikTokAdFormat.SparkAd"/>.
+    /// </summary>
+    public TikTokSparkAdAuthorization? SparkAuthorization { get; set; }
 
     /// <summary>Operation status (TikTok <c>operation_status</c>): <c>ENABLE</c> or <c>DISABLE</c>.</summary>
     public string OperationStatus { get; set; } = "ENABLE";

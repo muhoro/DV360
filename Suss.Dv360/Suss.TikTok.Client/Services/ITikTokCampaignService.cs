@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -18,4 +19,12 @@ public interface ITikTokCampaignService
     /// <returns>The same <paramref name="campaign"/> with its server-assigned id populated.</returns>
     /// <exception cref="Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
     Task<TikTokCampaign> CreateAsync(string advertiserId, TikTokCampaign campaign, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a campaign using the supplied TikTok execution context.
+    /// </summary>
+    Task<TikTokCampaign> CreateAsync(
+        TikTokExecutionContext executionContext,
+        TikTokCampaign campaign,
+        CancellationToken cancellationToken = default);
 }

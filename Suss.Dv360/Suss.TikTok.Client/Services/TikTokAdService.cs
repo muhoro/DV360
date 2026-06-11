@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Exceptions;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
@@ -32,6 +33,22 @@ internal sealed class TikTokAdService(
         string adGroupId,
         IReadOnlyList<TikTokAd> ads,
         CancellationToken cancellationToken = default)
+        => await CreateAsync(null, advertiserId, adGroupId, ads, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TikTokAd>> CreateAsync(
+        TikTokExecutionContext executionContext,
+        string adGroupId,
+        IReadOnlyList<TikTokAd> ads,
+        CancellationToken cancellationToken = default)
+        => await CreateAsync(executionContext, executionContext.AdvertiserId, adGroupId, ads, cancellationToken);
+
+    private async Task<IReadOnlyList<TikTokAd>> CreateAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        string adGroupId,
+        IReadOnlyList<TikTokAd> ads,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(adGroupId))
             throw new InvalidOperationException("adGroupId must be provided before creating ads.");
@@ -52,7 +69,9 @@ internal sealed class TikTokAdService(
             Creatives = creatives
         };
 
-        var data = await apiClient.PostAsync<CreateAdData>("ad/create/", body, cancellationToken);
+        var data = executionContext is null
+            ? await apiClient.PostAsync<CreateAdData>("ad/create/", body, cancellationToken)
+            : await apiClient.PostAsync<CreateAdData>(executionContext, "ad/create/", body, cancellationToken);
 
         // Map returned ad ids back onto the input ads, preserving order.
         var returnedIds = data.AdIds ?? [];
@@ -67,6 +86,11 @@ internal sealed class TikTokAdService(
     /// </summary>
     private static AdCreative MapToCreative(TikTokAd ad)
     {
+        var sparkAuthorization = ad.SparkAuthorization;
+        var tikTokItemId = sparkAuthorization?.TikTokItemId ?? ad.TikTokItemId;
+        var identityId = sparkAuthorization?.IdentityId ?? ad.IdentityId;
+        var identityType = sparkAuthorization?.IdentityType ?? ad.IdentityType;
+
         var creative = new AdCreative
         {
             AdName = ad.AdName,
@@ -74,8 +98,8 @@ internal sealed class TikTokAdService(
             AdText = ad.AdText,
             CallToAction = ad.CallToAction,
             LandingPageUrl = ad.LandingPageUrl,
-            IdentityId = ad.IdentityId,
-            IdentityType = ad.IdentityType,
+            IdentityId = identityId,
+            IdentityType = identityType,
             OperationStatus = ad.OperationStatus
         };
 
@@ -104,11 +128,19 @@ internal sealed class TikTokAdService(
                 break;
 
             case TikTokAdFormat.SparkAd:
-                if (string.IsNullOrWhiteSpace(ad.TikTokItemId))
+                if (string.IsNullOrWhiteSpace(tikTokItemId))
                     throw new InvalidOperationException($"Ad '{ad.AdName}' is SparkAd but has no TikTokItemId for the organic post.");
+                if (string.IsNullOrWhiteSpace(identityId) || string.IsNullOrWhiteSpace(identityType))
+                {
+                    throw new InvalidOperationException(
+                        $"Ad '{ad.AdName}' is SparkAd but has no authorized Spark identity. " +
+                        $"Provide {nameof(TikTokAd.SparkAuthorization)} or set IdentityId and IdentityType.");
+                }
+                if (sparkAuthorization is not null && !sparkAuthorization.IsActive(DateTimeOffset.UtcNow))
+                    throw new InvalidOperationException($"Ad '{ad.AdName}' uses an expired or inactive Spark authorization.");
                 // Spark Ads boost an existing organic post and use the authorized identity.
                 creative.AdFormat = "SINGLE_VIDEO";
-                creative.TikTokItemId = ad.TikTokItemId;
+                creative.TikTokItemId = tikTokItemId;
                 break;
 
             default:

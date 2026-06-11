@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -27,6 +28,14 @@ public interface ITikTokAudienceService
     Task<TikTokAudience> CreateFromFileAsync(string advertiserId, TikTokAudience audience, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates a custom audience using the supplied TikTok execution context.
+    /// </summary>
+    Task<TikTokAudience> CreateFromFileAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAudience audience,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Lists the existing custom audiences for an advertiser, allowing callers to reference an
     /// audience by id without re-uploading identifiers.
     /// </summary>
@@ -35,4 +44,11 @@ public interface ITikTokAudienceService
     /// <returns>The advertiser's audiences with ids and names populated.</returns>
     /// <exception cref="Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
     Task<IReadOnlyList<TikTokAudience>> ListAsync(string advertiserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists custom audiences using the supplied TikTok execution context.
+    /// </summary>
+    Task<IReadOnlyList<TikTokAudience>> ListAsync(
+        TikTokExecutionContext executionContext,
+        CancellationToken cancellationToken = default);
 }

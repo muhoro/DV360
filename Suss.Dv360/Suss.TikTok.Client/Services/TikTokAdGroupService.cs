@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
 
@@ -24,6 +25,20 @@ internal sealed class TikTokAdGroupService(
         string advertiserId,
         TikTokAdGroup adGroup,
         CancellationToken cancellationToken = default)
+        => await CreateAsync(null, advertiserId, adGroup, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<TikTokAdGroup> CreateAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAdGroup adGroup,
+        CancellationToken cancellationToken = default)
+        => await CreateAsync(executionContext, executionContext.AdvertiserId, adGroup, cancellationToken);
+
+    private async Task<TikTokAdGroup> CreateAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        TikTokAdGroup adGroup,
+        CancellationToken cancellationToken)
     {
         // The ad group cannot exist without a parent campaign.
         if (string.IsNullOrWhiteSpace(adGroup.CampaignId))
@@ -55,7 +70,9 @@ internal sealed class TikTokAdGroupService(
             OperationStatus = adGroup.OperationStatus
         };
 
-        var data = await apiClient.PostAsync<CreateAdGroupData>("adgroup/create/", body, cancellationToken);
+        var data = executionContext is null
+            ? await apiClient.PostAsync<CreateAdGroupData>("adgroup/create/", body, cancellationToken)
+            : await apiClient.PostAsync<CreateAdGroupData>(executionContext, "adgroup/create/", body, cancellationToken);
 
         adGroup.AdGroupId = data.AdGroupId;
         return adGroup;

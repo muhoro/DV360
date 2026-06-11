@@ -1,5 +1,7 @@
 namespace Suss.TikTok.Client.Models;
 
+using Suss.TikTok.Client.Auth;
+
 /// <summary>
 /// Input model for the end-to-end TikTok campaign creation workflow.
 /// <para>
@@ -16,6 +18,12 @@ public sealed class TikTokCampaignWorkflowRequest
     /// advertiser id from <see cref="Configuration.TikTokClientOptions.AdvertiserId"/> is used.
     /// </summary>
     public string? AdvertiserId { get; set; }
+
+    /// <summary>
+    /// Optional resolved context. When supplied, the workflow uses its access token and advertiser id
+    /// for every TikTok API call.
+    /// </summary>
+    public TikTokExecutionContext? ExecutionContext { get; set; }
 
     /// <summary>
     /// Assets to upload before ad creation. Each asset's id (<see cref="TikTokAsset.VideoId"/> /

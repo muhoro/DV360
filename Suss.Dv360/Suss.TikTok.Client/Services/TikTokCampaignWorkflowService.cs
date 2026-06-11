@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Configuration;
 using Suss.TikTok.Client.Models;
 
@@ -37,7 +38,8 @@ internal sealed class TikTokCampaignWorkflowService(
         TikTokCampaignWorkflowRequest request,
         CancellationToken cancellationToken = default)
     {
-        var advertiserId = request.AdvertiserId ?? _options.AdvertiserId;
+        var executionContext = request.ExecutionContext;
+        var advertiserId = request.AdvertiserId ?? executionContext?.AdvertiserId ?? _options.AdvertiserId;
         logger.LogInformation("Starting TikTok campaign workflow for advertiser {AdvertiserId}.", advertiserId);
 
         // ---- Step 1: Upload local/in-memory assets so their ids can be referenced by ads. URL assets
@@ -47,12 +49,22 @@ internal sealed class TikTokCampaignWorkflowService(
             .ToList();
         logger.LogInformation("Step 1/5: Uploading {Count} asset(s).", uploadAssets.Count);
         foreach (var asset in uploadAssets)
-            await assetService.UploadAsync(advertiserId, asset, cancellationToken);
+        {
+            if (executionContext is null)
+                await assetService.UploadAsync(advertiserId, asset, cancellationToken);
+            else
+                await assetService.UploadAsync(executionContext, asset, cancellationToken);
+        }
 
         // ---- Step 2: Create customer-match audiences. ----
         logger.LogInformation("Step 2/5: Creating {Count} audience(s).", request.Audiences.Count);
         foreach (var audience in request.Audiences)
-            await audienceService.CreateFromFileAsync(advertiserId, audience, cancellationToken);
+        {
+            if (executionContext is null)
+                await audienceService.CreateFromFileAsync(advertiserId, audience, cancellationToken);
+            else
+                await audienceService.CreateFromFileAsync(executionContext, audience, cancellationToken);
+        }
 
         // Auto-wire newly created audience ids into the ad group's included targeting.
         var createdAudienceIds = request.Audiences
@@ -72,13 +84,19 @@ internal sealed class TikTokCampaignWorkflowService(
 
         // ---- Step 3: Create the campaign. ----
         logger.LogInformation("Step 3/5: Creating campaign '{Name}'.", request.Campaign.CampaignName);
-        await campaignService.CreateAsync(advertiserId, request.Campaign, cancellationToken);
+        if (executionContext is null)
+            await campaignService.CreateAsync(advertiserId, request.Campaign, cancellationToken);
+        else
+            await campaignService.CreateAsync(executionContext, request.Campaign, cancellationToken);
 
         // ---- Step 4: Create the ad group under the campaign. ----
         request.AdGroup.CampaignId = request.Campaign.CampaignId;
         logger.LogInformation("Step 4/5: Creating ad group '{Name}' under campaign {CampaignId}.",
             request.AdGroup.AdGroupName, request.Campaign.CampaignId);
-        await adGroupService.CreateAsync(advertiserId, request.AdGroup, cancellationToken);
+        if (executionContext is null)
+            await adGroupService.CreateAsync(advertiserId, request.AdGroup, cancellationToken);
+        else
+            await adGroupService.CreateAsync(executionContext, request.AdGroup, cancellationToken);
 
         // ---- Step 5: Create the ads under the ad group. ----
         foreach (var ad in request.Ads)
@@ -88,7 +106,10 @@ internal sealed class TikTokCampaignWorkflowService(
 
         logger.LogInformation("Step 5/5: Creating {Count} ad(s) under ad group {AdGroupId}.",
             request.Ads.Count, request.AdGroup.AdGroupId);
-        await adService.CreateAsync(advertiserId, request.AdGroup.AdGroupId!, request.Ads, cancellationToken);
+        if (executionContext is null)
+            await adService.CreateAsync(advertiserId, request.AdGroup.AdGroupId!, request.Ads, cancellationToken);
+        else
+            await adService.CreateAsync(executionContext, request.AdGroup.AdGroupId!, request.Ads, cancellationToken);
 
         logger.LogInformation("TikTok campaign workflow completed successfully.");
 

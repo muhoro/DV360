@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Exceptions;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
@@ -36,6 +37,20 @@ internal sealed class TikTokAssetService(
         string advertiserId,
         TikTokAsset asset,
         CancellationToken cancellationToken = default)
+        => await UploadAsync(null, advertiserId, asset, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<TikTokAsset> UploadAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAsset asset,
+        CancellationToken cancellationToken = default)
+        => await UploadAsync(executionContext, executionContext.AdvertiserId, asset, cancellationToken);
+
+    private async Task<TikTokAsset> UploadAsync(
+        TikTokExecutionContext? executionContext,
+        string advertiserId,
+        TikTokAsset asset,
+        CancellationToken cancellationToken)
     {
         // Resolve the file bytes from in-memory content, a remote URL, or a local file path.
         var source = await ReadAssetSourceAsync(asset, cancellationToken);
@@ -53,18 +68,20 @@ internal sealed class TikTokAssetService(
 
         return asset.AssetType switch
         {
-            TikTokAssetType.Image => await UploadImageAsync(advertiserId, asset, bytes, fileName, signature, cancellationToken),
-            TikTokAssetType.Video => await UploadVideoAsync(advertiserId, asset, bytes, fileName, signature, cancellationToken),
-            TikTokAssetType.Audio => await UploadAudioAsync(advertiserId, asset, bytes, fileName, signature, cancellationToken),
+            TikTokAssetType.Image => await UploadImageAsync(executionContext, advertiserId, asset, bytes, fileName, signature, cancellationToken),
+            TikTokAssetType.Video => await UploadVideoAsync(executionContext, advertiserId, asset, bytes, fileName, signature, cancellationToken),
+            TikTokAssetType.Audio => await UploadAudioAsync(executionContext, advertiserId, asset, bytes, fileName, signature, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported asset type '{asset.AssetType}'.")
         };
     }
 
     private async Task<TikTokAsset> UploadImageAsync(
-        string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
+        TikTokExecutionContext? executionContext, string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
         using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "image_file", "image_signature");
-        var data = await apiClient.PostMultipartAsync<ImageUploadData>("file/image/ad/upload/", content, ct);
+        var data = executionContext is null
+            ? await apiClient.PostMultipartAsync<ImageUploadData>("file/image/ad/upload/", content, ct)
+            : await apiClient.PostMultipartAsync<ImageUploadData>(executionContext, "file/image/ad/upload/", content, ct);
 
         asset.ImageId = data.ImageId;
         asset.PreviewUrl = data.Url;
@@ -72,10 +89,12 @@ internal sealed class TikTokAssetService(
     }
 
     private async Task<TikTokAsset> UploadVideoAsync(
-        string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
+        TikTokExecutionContext? executionContext, string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
         using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "video_file", "video_signature");
-        var data = await apiClient.PostMultipartAsync<JsonElement>("file/video/ad/upload/", content, ct);
+        var data = executionContext is null
+            ? await apiClient.PostMultipartAsync<JsonElement>("file/video/ad/upload/", content, ct)
+            : await apiClient.PostMultipartAsync<JsonElement>(executionContext, "file/video/ad/upload/", content, ct);
 
         var first = ParseVideoUploadData(data)
             ?? throw new TikTokApiException("Video upload succeeded but returned no video data.");
@@ -85,10 +104,12 @@ internal sealed class TikTokAssetService(
     }
 
     private async Task<TikTokAsset> UploadAudioAsync(
-        string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
+        TikTokExecutionContext? executionContext, string advertiserId, TikTokAsset asset, byte[] bytes, string fileName, string signature, CancellationToken ct)
     {
         using var content = BuildMultipart(advertiserId, bytes, fileName, signature, asset.DisplayName, "audio_file", "audio_signature");
-        var data = await apiClient.PostMultipartAsync<AudioUploadData>("file/audio/ad/upload/", content, ct);
+        var data = executionContext is null
+            ? await apiClient.PostMultipartAsync<AudioUploadData>("file/audio/ad/upload/", content, ct)
+            : await apiClient.PostMultipartAsync<AudioUploadData>(executionContext, "file/audio/ad/upload/", content, ct);
 
         asset.AudioId = data.AudioId;
         return asset;

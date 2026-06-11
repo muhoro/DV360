@@ -16,6 +16,7 @@ The client supports the full campaign-publishing lifecycle:
 1. **Authentication** – multiple strategies behind one abstraction:
    - **Access Token** – use a pre-issued, long-lived `access_token`.
    - **OAuth Authorization Code** – exchange an `auth_code` (+ `app_id`/`secret`) for an `access_token`.
+   - **OAuth linking helper** – build the TikTok consent URL and exchange callback codes via `ITikTokOAuthService`.
 2. **Campaign creation** – supports **video**, **image**, and **Spark Ads** creatives (at the ad layer).
 3. **Asset uploading** – **images**, **videos**, and **audio** via TikTok's multipart upload endpoints,
    with automatic `file_signature` (MD5) computation.
@@ -105,6 +106,10 @@ builder.Services.AddTikTokClient(options =>
     "AppId": "<your-app-id>",
     "AppSecret": "<your-app-secret>",
     "AuthCode": "<one-time-oauth-auth-code>",
+    "AuthorizationUrl": "https://business-api.tiktok.com/portal/auth",
+    "Scopes": [ "ad.read", "ad.write" ],
+    "ManagedIdentityId": "<your-platform-owned-identity-id>",
+    "ManagedIdentityType": "<your-platform-owned-identity-type>",
     "AdvertiserId": "<your-advertiser-id>",
     "BaseUrl": "https://business-api.tiktok.com",
     "ApiVersion": "v1.3"
@@ -119,6 +124,10 @@ builder.Services.AddTikTokClient(options =>
 | `AppId`       | When `AuthMode = OAuth…`          | TikTok developer app id.                                 |
 | `AppSecret`   | When `AuthMode = OAuth…`          | TikTok developer app secret.                             |
 | `AuthCode`    | When `AuthMode = OAuth…`          | One-time authorization code from the consent redirect.   |
+| `AuthorizationUrl` | No                           | Override for TikTok's OAuth consent URL.                 |
+| `Scopes`      | No                                | Default scopes requested when building consent URLs.     |
+| `ManagedIdentityId` | No                          | Platform-owned identity used for managed-account ads.    |
+| `ManagedIdentityType` | No                        | Identity type for `ManagedIdentityId`.                   |
 | `AdvertiserId`| Yes                               | Default advertiser scope for resource operations.        |
 | `BaseUrl`     | No (default production host)      | Override for sandbox.                                    |
 | `ApiVersion`  | No (default `v1.3`)               | Marketing API version segment.                           |
@@ -126,6 +135,72 @@ builder.Services.AddTikTokClient(options =>
 ---
 
 ## Usage
+
+### OAuth linking flow
+
+There are four supported authorization lanes:
+
+| Scenario | Campaign advertiser | Token used for API calls | What the customer contributes |
+|----------|---------------------|--------------------------|-------------------------------|
+| Managed advertiser account | Your advertiser id | Your long-lived access token | Nothing required |
+| Client advertiser account | Customer advertiser id | Customer-granted OAuth access token | TikTok Business/Ads consent |
+| Client social identity | Usually your advertiser id | Your campaign token, plus stored social authorization data | TikTok social/identity consent |
+| Spark Ad authorization | Your advertiser id or customer advertiser id | Campaign token for selected advertiser, plus stored Spark authorization data | Organic post/identity permission |
+
+For the managed advertiser account scenario, configure `AuthMode = AccessToken`, `AccessToken`, and
+`AdvertiserId` with your platform-owned TikTok values. `StaticTokenAuthProvider` uses that token as-is;
+there is no refresh-token flow in this lane.
+
+Your web app owns the OAuth routes and storage. The client helps with the TikTok-specific URL and
+token exchange. Store the scenario in your own state/session/database before redirecting; the
+generated OAuth URL only sends TikTok-recognized OAuth values plus any explicit extra parameters you
+pass.
+
+```csharp
+// GET /tiktok/connect
+var oauth = serviceProvider.GetRequiredService<ITikTokOAuthService>();
+var state = "<random-csrf-correlation-value>"; // store this in session/db before redirecting
+
+var authorizationUrl = oauth.BuildAuthorizationUrl(
+    TikTokAuthScenario.ClientAdvertiserAccount,
+    redirectUri: "https://yourapp.example.com/tiktok/callback",
+    state: state,
+    scopes: ["ad.read", "ad.write"]);
+
+return Results.Redirect(authorizationUrl);
+```
+
+```csharp
+// GET /tiktok/callback?code=...&state=...
+// First validate the returned state equals the value you stored for this user/session.
+var token = await oauth.ExchangeAuthorizationCodeAsync(code);
+
+// For business-to-business linking, let the customer choose one advertiser id from token.AdvertiserIds
+// or from a later advertiser-list API call, then store this connection against the customer account.
+var connection = oauth.CreateClientAdvertiserConnection(token, selectedAdvertiserId);
+```
+
+Use `connection.AccessToken` and `connection.AdvertiserId` when campaigns should run inside the
+customer's own TikTok Business/Ads account.
+
+For Spark Ads, campaign calls can run through either your managed advertiser account or the
+customer's linked advertiser account. Attach the client's Spark authorization to the ad in both
+cases:
+
+```csharp
+var ad = new TikTokAd
+{
+    AdName = "Boost client post",
+    Format = TikTokAdFormat.SparkAd,
+    AdText = "Watch now",
+    SparkAuthorization = new TikTokSparkAdAuthorization
+    {
+        TikTokItemId = "<client-organic-post-id>",
+        IdentityId = "<authorized-spark-identity-id-or-code>",
+        IdentityType = "AUTH_CODE"
+    }
+};
+```
 
 ### End-to-end workflow
 

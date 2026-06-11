@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -26,6 +27,15 @@ public interface ITikTokAdService
     /// <exception cref="InvalidOperationException">Thrown when a required asset reference is missing for a format.</exception>
     Task<IReadOnlyList<TikTokAd>> CreateAsync(
         string advertiserId,
+        string adGroupId,
+        IReadOnlyList<TikTokAd> ads,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates one or more ads using the supplied TikTok execution context.
+    /// </summary>
+    Task<IReadOnlyList<TikTokAd>> CreateAsync(
+        TikTokExecutionContext executionContext,
         string adGroupId,
         IReadOnlyList<TikTokAd> ads,
         CancellationToken cancellationToken = default);

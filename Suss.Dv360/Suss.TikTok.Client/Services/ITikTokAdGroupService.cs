@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -20,4 +21,12 @@ public interface ITikTokAdGroupService
     /// <exception cref="Exceptions.TikTokApiException">Thrown when the TikTok API returns an error.</exception>
     /// <exception cref="InvalidOperationException">Thrown when <see cref="TikTokAdGroup.CampaignId"/> is not set.</exception>
     Task<TikTokAdGroup> CreateAsync(string advertiserId, TikTokAdGroup adGroup, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates an ad group using the supplied TikTok execution context.
+    /// </summary>
+    Task<TikTokAdGroup> CreateAsync(
+        TikTokExecutionContext executionContext,
+        TikTokAdGroup adGroup,
+        CancellationToken cancellationToken = default);
 }

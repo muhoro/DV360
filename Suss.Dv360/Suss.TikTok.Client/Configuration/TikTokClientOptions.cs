@@ -41,6 +41,30 @@ public sealed class TikTokClientOptions
     public string? AuthCode { get; set; }
 
     /// <summary>
+    /// Optional absolute TikTok OAuth authorization URL. Defaults to
+    /// <c>{BaseUrl}/portal/auth</c>. Override this if TikTok provides an environment-specific
+    /// authorization host for your app.
+    /// </summary>
+    public string? AuthorizationUrl { get; set; }
+
+    /// <summary>
+    /// Default OAuth scopes requested when building an authorization URL.
+    /// Scopes can also be supplied per call to <c>ITikTokOAuthService.BuildAuthorizationUrl</c>.
+    /// </summary>
+    public IList<string> Scopes { get; set; } = [];
+
+    /// <summary>
+    /// Optional platform-owned identity id used when customers run ads through your managed TikTok
+    /// advertiser account.
+    /// </summary>
+    public string? ManagedIdentityId { get; set; }
+
+    /// <summary>
+    /// Optional platform-owned identity type used with <see cref="ManagedIdentityId"/>.
+    /// </summary>
+    public string? ManagedIdentityType { get; set; }
+
+    /// <summary>
     /// A pre-issued long-lived access token. Required when <see cref="AuthMode"/> is
     /// <see cref="AuthMode.AccessToken"/>; ignored otherwise (the token is fetched instead).
     /// </summary>
