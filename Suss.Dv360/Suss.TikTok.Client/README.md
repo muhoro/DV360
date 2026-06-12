@@ -28,7 +28,10 @@ The client supports the full campaign-publishing lifecycle:
 
 ## Architecture
 
-The library is layered so transport, auth, mapping, and orchestration stay independent:
+The library follows the same organization style as the DV360 client: public service interfaces,
+internal sealed implementations, flat models, and a small auth/infrastructure layer for direct
+platform calls. Workflow-level auth mode decisions stay in `ITikTokCampaignWorkflowService`; direct
+TikTok HTTP mechanics stay in auth/infrastructure/resource services.
 
 ```
 Configuration (options + DI)
@@ -67,9 +70,9 @@ Workflow  ── ITikTokCampaignWorkflowService
 - **Flat models, private mapping.** Public models (`TikTokCampaign`, `TikTokAdGroup`, `TikTokAd`, …) are
   flat and friendly. Each service maps them to/from TikTok's `snake_case` request/response shapes using
   private nested DTOs, keeping the API surface stable even if TikTok's payloads change.
-- **Pluggable auth.** `ITikTokAuthProvider` abstracts token acquisition. The token is attached via
-  TikTok's custom `Access-Token` header (not a standard bearer header), and OAuth token exchange is
-  cached and concurrency-safe.
+- **Stateless TikTok calls.** Auth/infrastructure services only build or send direct TikTok requests:
+  token resolution, OAuth token exchange, API URL building, headers, serialization, and envelope
+  handling. Connection shaping and auth-mode coordination sit in the workflow layer.
 - **Privacy-preserving audiences.** Customer-match identifiers are normalized and SHA-256 hashed
   **locally** before upload; raw PII never leaves the process unless `ValuesArePreHashed` is set.
 - **One-call workflow.** `ITikTokCampaignWorkflowService` wires parent IDs and uploaded asset IDs
@@ -147,22 +150,22 @@ There are four supported authorization lanes:
 | Client social identity | Usually your advertiser id | Your campaign token, plus stored social authorization data | TikTok social/identity consent |
 | Spark Ad authorization | Your advertiser id or customer advertiser id | Campaign token for selected advertiser, plus stored Spark authorization data | Organic post/identity permission |
 
-For the managed advertiser account scenario, configure `AuthMode = AccessToken`, `AccessToken`, and
+For the managed advertiser account auth mode, configure `AuthMode = AccessToken`, `AccessToken`, and
 `AdvertiserId` with your platform-owned TikTok values. `StaticTokenAuthProvider` uses that token as-is;
 there is no refresh-token flow in this lane.
 
 Your web app owns the OAuth routes and storage. The client helps with the TikTok-specific URL and
-token exchange. Store the scenario in your own state/session/database before redirecting; the
+token exchange. Store the auth mode in your own state/session/database before redirecting; the
 generated OAuth URL only sends TikTok-recognized OAuth values plus any explicit extra parameters you
 pass.
 
 ```csharp
 // GET /tiktok/connect
-var oauth = serviceProvider.GetRequiredService<ITikTokOAuthService>();
+var workflow = serviceProvider.GetRequiredService<ITikTokCampaignWorkflowService>();
 var state = "<random-csrf-correlation-value>"; // store this in session/db before redirecting
 
-var authorizationUrl = oauth.BuildAuthorizationUrl(
-    TikTokAuthScenario.ClientAdvertiserAccount,
+var authorizationUrl = workflow.BuildAuthorizationUrl(
+    TikTokAuthMode.ClientAdvertiserAccount,
     redirectUri: "https://yourapp.example.com/tiktok/callback",
     state: state,
     scopes: ["ad.read", "ad.write"]);
@@ -173,11 +176,11 @@ return Results.Redirect(authorizationUrl);
 ```csharp
 // GET /tiktok/callback?code=...&state=...
 // First validate the returned state equals the value you stored for this user/session.
-var token = await oauth.ExchangeAuthorizationCodeAsync(code);
+var token = await workflow.ExchangeAuthorizationCodeAsync(code);
 
 // For business-to-business linking, let the customer choose one advertiser id from token.AdvertiserIds
 // or from a later advertiser-list API call, then store this connection against the customer account.
-var connection = oauth.CreateClientAdvertiserConnection(token, selectedAdvertiserId);
+var connection = workflow.CreateClientAdvertiserConnection(token, selectedAdvertiserId);
 ```
 
 Use `connection.AccessToken` and `connection.AdvertiserId` when campaigns should run inside the

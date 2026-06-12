@@ -1,4 +1,4 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Represents the platform-owned TikTok advertiser account used when customers run campaigns
@@ -9,8 +9,8 @@ public sealed class TikTokManagedAdvertiserConnection
     /// <summary>The organization/customer mapped to this managed advertiser execution lane.</summary>
     public Guid OrganizationId { get; init; }
 
-    /// <summary>The scenario represented by this connection.</summary>
-    public TikTokAuthScenario Scenario { get; init; } = TikTokAuthScenario.ManagedAdvertiserAccount;
+    /// <summary>The authorization mode represented by this connection.</summary>
+    public TikTokAuthMode AuthMode { get; init; } = TikTokAuthMode.ManagedAdvertiserAccount;
 
     /// <summary>The platform-owned advertiser id used for campaign, ad group, ad, and asset calls.</summary>
     public required string AdvertiserId { get; init; }

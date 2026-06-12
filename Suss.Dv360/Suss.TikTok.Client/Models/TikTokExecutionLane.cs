@@ -1,4 +1,4 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Identifies which advertiser-account lane should execute TikTok campaign API calls.

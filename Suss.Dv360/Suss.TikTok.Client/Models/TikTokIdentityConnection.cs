@@ -1,4 +1,4 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Customer TikTok social identity authorization metadata.

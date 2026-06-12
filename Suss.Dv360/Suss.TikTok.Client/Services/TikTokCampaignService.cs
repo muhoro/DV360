@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Infrastructure;
 using Suss.TikTok.Client.Models;
 

@@ -1,7 +1,5 @@
 namespace Suss.TikTok.Client.Models;
 
-using Suss.TikTok.Client.Auth;
-
 /// <summary>
 /// The creative format of a TikTok ad. Determines which asset ids and fields are required.
 /// </summary>

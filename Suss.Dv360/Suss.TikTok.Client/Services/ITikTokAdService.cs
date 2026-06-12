@@ -1,5 +1,4 @@
 using Suss.TikTok.Client.Models;
-using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 

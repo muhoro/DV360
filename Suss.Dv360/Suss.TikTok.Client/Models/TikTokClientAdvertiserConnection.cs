@@ -1,9 +1,9 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Represents a customer-owned TikTok advertiser account linked to your app through OAuth.
 /// <para>
-/// Use this scenario when the customer has their own TikTok Business/Ads account and grants your
+/// Use this auth mode when the customer has their own TikTok Business/Ads account and grants your
 /// app permission to manage campaigns in their advertiser account. Store this connection against
 /// the customer/business record in the host application.
 /// </para>
@@ -16,8 +16,8 @@ public sealed class TikTokClientAdvertiserConnection
     /// <summary>The organization/customer that owns this connection.</summary>
     public Guid OrganizationId { get; init; }
 
-    /// <summary>The scenario represented by this connection.</summary>
-    public TikTokAuthScenario Scenario { get; init; } = TikTokAuthScenario.ClientAdvertiserAccount;
+    /// <summary>The authorization mode represented by this connection.</summary>
+    public TikTokAuthMode AuthMode { get; init; } = TikTokAuthMode.ClientAdvertiserAccount;
 
     /// <summary>The customer-owned advertiser id selected after OAuth.</summary>
     public required string AdvertiserId { get; init; }

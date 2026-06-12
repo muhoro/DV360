@@ -1,7 +1,5 @@
 namespace Suss.TikTok.Client.Models;
 
-using Suss.TikTok.Client.Auth;
-
 /// <summary>
 /// Input model for the end-to-end TikTok campaign creation workflow.
 /// <para>

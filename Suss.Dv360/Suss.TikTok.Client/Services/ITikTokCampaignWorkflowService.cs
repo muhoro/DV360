@@ -1,4 +1,5 @@
 using Suss.TikTok.Client.Models;
+using Suss.TikTok.Client.Auth;
 
 namespace Suss.TikTok.Client.Services;
 
@@ -8,6 +9,41 @@ namespace Suss.TikTok.Client.Services;
 /// </summary>
 public interface ITikTokCampaignWorkflowService
 {
+    /// <summary>
+    /// Builds the TikTok OAuth consent URL for a workflow-managed authorization mode.
+    /// </summary>
+    string BuildAuthorizationUrl(
+        TikTokAuthMode authMode,
+        string redirectUri,
+        string state,
+        IEnumerable<string>? scopes = null,
+        IReadOnlyDictionary<string, string?>? additionalParameters = null);
+
+    /// <summary>
+    /// Exchanges a TikTok OAuth callback authorization code for token data.
+    /// </summary>
+    Task<TikTokOAuthTokenResult> ExchangeAuthorizationCodeAsync(
+        string authCode,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a customer-owned advertiser connection from a token result and selected advertiser id.
+    /// </summary>
+    TikTokClientAdvertiserConnection CreateClientAdvertiserConnection(
+        TikTokOAuthTokenResult token,
+        string advertiserId);
+
+    /// <summary>
+    /// Creates one customer-owned advertiser connection for each advertiser id returned by TikTok.
+    /// </summary>
+    IReadOnlyList<TikTokClientAdvertiserConnection> CreateClientAdvertiserConnections(
+        TikTokOAuthTokenResult token);
+
+    /// <summary>
+    /// Returns the configured managed advertiser connection for workflow-managed campaign execution.
+    /// </summary>
+    TikTokManagedAdvertiserConnection GetManagedAdvertiserConnection();
+
     /// <summary>
     /// Executes the complete workflow:
     /// <list type="number">

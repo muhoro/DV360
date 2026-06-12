@@ -1,4 +1,4 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Lifecycle status for stored TikTok advertiser, identity, and Spark authorizations.

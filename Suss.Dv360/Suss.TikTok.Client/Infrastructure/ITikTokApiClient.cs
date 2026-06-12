@@ -1,6 +1,6 @@
 namespace Suss.TikTok.Client.Infrastructure;
 
-using Suss.TikTok.Client.Auth;
+using Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Low-level transport abstraction over the TikTok Marketing API.

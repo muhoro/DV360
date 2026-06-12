@@ -1,4 +1,4 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Spark Ad authorization captured from a client's TikTok social account or organic post.
@@ -16,8 +16,8 @@ public sealed class TikTokSparkAdAuthorization
     /// <summary>The organization/customer that owns this Spark permission.</summary>
     public Guid OrganizationId { get; init; }
 
-    /// <summary>The scenario represented by this authorization.</summary>
-    public TikTokAuthScenario Scenario { get; init; } = TikTokAuthScenario.SparkAdAuthorization;
+    /// <summary>The authorization mode represented by this authorization.</summary>
+    public TikTokAuthMode AuthMode { get; init; } = TikTokAuthMode.SparkAdAuthorization;
 
     /// <summary>The organic TikTok post/item id to boost.</summary>
     public required string TikTokItemId { get; init; }

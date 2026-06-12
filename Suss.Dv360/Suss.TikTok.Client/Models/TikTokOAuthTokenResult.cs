@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Token payload returned by TikTok after an OAuth authorization-code exchange.

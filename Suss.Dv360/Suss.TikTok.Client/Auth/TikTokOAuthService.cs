@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using Suss.TikTok.Client.Configuration;
 using Suss.TikTok.Client.Exceptions;
+using Suss.TikTok.Client.Models;
 
 namespace Suss.TikTok.Client.Auth;
 
@@ -26,7 +27,7 @@ internal sealed class TikTokOAuthService(
         IEnumerable<string>? scopes = null,
         IReadOnlyDictionary<string, string?>? additionalParameters = null)
         => BuildAuthorizationUrl(
-            TikTokAuthScenario.ClientSocialIdentity,
+            TikTokAuthMode.ClientSocialIdentity,
             redirectUri,
             state,
             scopes,
@@ -34,7 +35,7 @@ internal sealed class TikTokOAuthService(
 
     /// <inheritdoc />
     public string BuildAuthorizationUrl(
-        TikTokAuthScenario scenario,
+        TikTokAuthMode authMode,
         string redirectUri,
         string state,
         IEnumerable<string>? scopes = null,
@@ -52,7 +53,7 @@ internal sealed class TikTokOAuthService(
         if (string.IsNullOrWhiteSpace(state))
             throw new TikTokApiException("A state value is required to build a TikTok OAuth URL.");
 
-        if (scenario is TikTokAuthScenario.ManagedAdvertiserAccount)
+        if (authMode is TikTokAuthMode.ManagedAdvertiserAccount)
             throw new TikTokApiException("Managed advertiser account mode uses the configured lifetime access token and does not start OAuth.");
 
         var query = new Dictionary<string, string?>
@@ -75,7 +76,7 @@ internal sealed class TikTokOAuthService(
                 query[parameter.Key] = parameter.Value;
         }
 
-        // Keep the scenario in the host app's pending OAuth state record. TikTok only needs the
+        // Keep the auth mode in the workflow/host app's pending OAuth state record. TikTok only needs the
         // opaque state value; the callback can use it to recover ClientAdvertiser/Social/Spark intent.
         var authUrl = string.IsNullOrWhiteSpace(_options.AuthorizationUrl)
             ? $"{_options.BaseUrl.TrimEnd('/')}/portal/auth"
@@ -140,85 +141,6 @@ internal sealed class TikTokOAuthService(
         return envelope.Data;
     }
 
-    /// <inheritdoc />
-    public TikTokClientAdvertiserConnection CreateClientAdvertiserConnection(
-        TikTokOAuthTokenResult token,
-        string advertiserId)
-    {
-        EnsureUsableToken(token);
-
-        if (string.IsNullOrWhiteSpace(advertiserId))
-            throw new TikTokApiException("A customer advertiser id is required to create a client advertiser connection.");
-
-        if (token.AdvertiserIds.Count > 0 && !token.AdvertiserIds.Contains(advertiserId))
-        {
-            throw new TikTokApiException(
-                $"Advertiser id '{advertiserId}' was not present in the TikTok OAuth token response.");
-        }
-
-        return new TikTokClientAdvertiserConnection
-        {
-            AdvertiserId = advertiserId,
-            AccessToken = token.AccessToken,
-            RefreshToken = token.RefreshToken,
-            ExpiresIn = token.ExpiresIn,
-            RefreshExpiresIn = token.RefreshExpiresIn,
-            Scope = token.Scope,
-            AccessTokenExpiresAt = token.ExpiresIn is null ? null : DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn.Value),
-            RefreshTokenExpiresAt = token.RefreshExpiresIn is null ? null : DateTimeOffset.UtcNow.AddSeconds(token.RefreshExpiresIn.Value),
-            AdvertiserName = token.Advertisers.FirstOrDefault(advertiser => advertiser.AdvertiserId == advertiserId)?.Name,
-            AdvertiserStatus = token.Advertisers.FirstOrDefault(advertiser => advertiser.AdvertiserId == advertiserId)?.Status,
-            Currency = token.Advertisers.FirstOrDefault(advertiser => advertiser.AdvertiserId == advertiserId)?.Currency,
-            Timezone = token.Advertisers.FirstOrDefault(advertiser => advertiser.AdvertiserId == advertiserId)?.Timezone,
-            Country = token.Advertisers.FirstOrDefault(advertiser => advertiser.AdvertiserId == advertiserId)?.Country
-        };
-    }
-
-    /// <inheritdoc />
-    public IReadOnlyList<TikTokClientAdvertiserConnection> CreateClientAdvertiserConnections(
-        TikTokOAuthTokenResult token)
-    {
-        EnsureUsableToken(token);
-
-        if (token.AdvertiserIds.Count == 0)
-        {
-            throw new TikTokApiException(
-                "TikTok did not return advertiser ids in the OAuth token response. " +
-                "Call the advertiser-list endpoint for this token, then create a connection for the selected advertiser id.");
-        }
-
-        return token.AdvertiserIds
-            .Where(advertiserId => !string.IsNullOrWhiteSpace(advertiserId))
-            .Select(advertiserId => CreateClientAdvertiserConnection(token, advertiserId))
-            .ToArray();
-    }
-
-    /// <inheritdoc />
-    public TikTokManagedAdvertiserConnection GetManagedAdvertiserConnection()
-    {
-        if (string.IsNullOrWhiteSpace(_options.AccessToken))
-        {
-            throw new TikTokApiException(
-                $"Managed advertiser account mode requires '{nameof(TikTokClientOptions.AccessToken)}' " +
-                "to contain your platform-owned long-lived TikTok access token.");
-        }
-
-        if (string.IsNullOrWhiteSpace(_options.AdvertiserId))
-        {
-            throw new TikTokApiException(
-                $"Managed advertiser account mode requires '{nameof(TikTokClientOptions.AdvertiserId)}' " +
-                "to contain your platform-owned TikTok advertiser id.");
-        }
-
-        return new TikTokManagedAdvertiserConnection
-        {
-            AdvertiserId = _options.AdvertiserId,
-            AccessToken = _options.AccessToken,
-            IdentityId = _options.ManagedIdentityId,
-            IdentityType = _options.ManagedIdentityType
-        };
-    }
-
     private static string AppendQuery(string url, IReadOnlyDictionary<string, string?> parameters)
     {
         var separator = url.Contains('?') ? '&' : '?';
@@ -227,15 +149,6 @@ internal sealed class TikTokOAuthService(
             .Select(parameter => $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value!)}"));
 
         return string.IsNullOrEmpty(query) ? url : $"{url}{separator}{query}";
-    }
-
-    private static void EnsureUsableToken(TikTokOAuthTokenResult token)
-    {
-        if (token is null)
-            throw new TikTokApiException("A TikTok OAuth token result is required to create a client advertiser connection.");
-
-        if (string.IsNullOrWhiteSpace(token.AccessToken))
-            throw new TikTokApiException("The TikTok OAuth token result does not contain an access token.");
     }
 
     private sealed class TokenEnvelope

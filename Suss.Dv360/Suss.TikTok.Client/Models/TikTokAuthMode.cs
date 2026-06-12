@@ -1,14 +1,15 @@
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
-/// Describes the TikTok authorization lane being used for a customer.
+/// Describes the TikTok authorization mode being used for a customer.
 /// <para>
-/// These scenarios are deliberately separate because managed-account access, customer advertiser
-/// access, social identity linking, and Spark post authorization produce different identifiers and should be stored
-/// independently by the host application.
+/// These modes are deliberately separate because managed-account access, customer advertiser
+/// access, social identity linking, and Spark post authorization produce different identifiers and
+/// should be coordinated by the workflow/host application rather than mixed in the stateless API
+/// calls.
 /// </para>
 /// </summary>
-public enum TikTokAuthScenario
+public enum TikTokAuthMode
 {
     /// <summary>
     /// Campaigns run through the platform-owned TikTok advertiser account using the platform's

@@ -10,6 +10,24 @@ advertiser id and access token used by TikTok Marketing API calls. Identity conn
 authorizations are separate records that can be attached to creatives but must not replace campaign
 API credentials.
 
+## Organization Breakdown
+
+The TikTok client follows the same organization principle as the DV360 client:
+
+| Folder | Responsibility |
+|--------|----------------|
+| `Models/` | Flat request/result/connection/context models passed by callers. |
+| `Services/` | Public workflow/resource interfaces and internal sealed implementations. Workflow coordinates auth-mode decisions and multi-step campaign setup. |
+| `Infrastructure/` | Stateless TikTok Marketing API transport: URL building, headers, JSON/multipart, response envelope handling. |
+| `Auth/` | Stateless token and OAuth mechanics: configured token providers, auth-code provider, OAuth URL/token endpoint caller. |
+| `Configuration/` | Options and dependency-injection registration. |
+| `Exceptions/` | TikTok-specific exception type. |
+
+Rule of thumb: if code shapes application concepts such as managed/client advertiser connections,
+selected advertiser IDs, or Spark authorization composition, it belongs in the workflow layer or the
+host app. If code directly builds or sends a TikTok request, it belongs in auth, infrastructure, or a
+resource service.
+
 ## Summary
 
 | Scenario | Customer requirement | Campaign advertiser id | API access token | What we store |
@@ -75,7 +93,7 @@ Notes:
 - No customer OAuth is required.
 - No refresh-token behavior is implemented for this lane because the product assumption is that
   TikTok provides a long-lived token for our app/ad account.
-- `ITikTokOAuthService.GetManagedAdvertiserConnection()` validates that the configured token and
+- `ITikTokCampaignWorkflowService.GetManagedAdvertiserConnection()` validates that the configured token and
   advertiser id exist before the host app uses this lane.
 
 ## 2. Client Advertiser Account
@@ -85,9 +103,9 @@ authorizes our app to manage campaigns in their advertiser account.
 
 Flow:
 
-1. Create a pending OAuth record in our system with customer id, scenario, redirect URI, and random
+1. Create a pending OAuth record in our system with customer id, auth mode, redirect URI, and random
    `state`.
-2. Redirect the customer to `BuildAuthorizationUrl(TikTokAuthScenario.ClientAdvertiserAccount, ...)`.
+2. Redirect the customer to `BuildAuthorizationUrl(TikTokAuthMode.ClientAdvertiserAccount, ...)`.
 3. TikTok redirects back with `code` and `state`.
 4. Validate `state` against our pending OAuth record.
 5. Exchange `code` with `ExchangeAuthorizationCodeAsync`.
@@ -99,20 +117,20 @@ Flow:
 Code path:
 
 ```csharp
-var url = oauth.BuildAuthorizationUrl(
-    TikTokAuthScenario.ClientAdvertiserAccount,
+var url = workflow.BuildAuthorizationUrl(
+    TikTokAuthMode.ClientAdvertiserAccount,
     redirectUri,
     state,
     scopes: ["ad.read", "ad.write"]);
 
-var token = await oauth.ExchangeAuthorizationCodeAsync(code);
-var connections = oauth.CreateClientAdvertiserConnections(token);
+var token = await workflow.ExchangeAuthorizationCodeAsync(code);
+var connections = workflow.CreateClientAdvertiserConnections(token);
 ```
 
 For a selected advertiser:
 
 ```csharp
-var connection = oauth.CreateClientAdvertiserConnection(token, selectedAdvertiserId);
+var connection = workflow.CreateClientAdvertiserConnection(token, selectedAdvertiserId);
 ```
 
 Notes:
@@ -129,7 +147,7 @@ typically runs through our managed advertiser account.
 
 Flow:
 
-1. Create a pending OAuth/linking record with scenario `ClientSocialIdentity`.
+1. Create a pending OAuth/linking record with auth mode `ClientSocialIdentity`.
 2. Build and redirect to the TikTok authorization URL.
 3. Validate callback `state`.
 4. Exchange the returned code.
@@ -182,7 +200,7 @@ Validation:
 
 Client-Owned Advertiser Plus Client-Owned Spark Identity:
 
-This is catered for by combining scenario 2 and scenario 4:
+This is catered for by combining auth mode 2 and auth mode 4:
 
 ```text
 Client advertiser account connection
@@ -205,7 +223,7 @@ The client fails early for common integration mistakes:
 - Missing app id when building OAuth URLs.
 - Missing redirect URI or non-absolute redirect URI.
 - Missing state value.
-- Attempting to start OAuth for the managed advertiser scenario.
+- Attempting to start OAuth for the managed advertiser auth mode.
 - Missing app id/app secret during token exchange.
 - Empty auth code during token exchange.
 - Invalid or non-zero TikTok token exchange response.

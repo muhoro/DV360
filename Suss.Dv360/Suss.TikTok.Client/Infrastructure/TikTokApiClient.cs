@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Suss.TikTok.Client.Auth;
 using Suss.TikTok.Client.Configuration;
 using Suss.TikTok.Client.Exceptions;
+using Suss.TikTok.Client.Models;
 
 namespace Suss.TikTok.Client.Infrastructure;
 

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Suss.TikTok.Client.Auth;
+namespace Suss.TikTok.Client.Models;
 
 /// <summary>
 /// Metadata for an advertiser account available to a TikTok OAuth token.
